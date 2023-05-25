@@ -2,8 +2,8 @@ import os
 import sqlite3 as sl
 
 from PySide6.QtSql import QSqlQueryModel
-from PySide6.QtWidgets import QMainWindow, QDialog, QTableView, QHeaderView, QFileDialog
-from PySide6.QtWidgets import QLabel, QStatusBar, QComboBox, QWidget, QVBoxLayout
+from PySide6.QtWidgets import QMainWindow, QDialog, QTableView, QHeaderView, QHBoxLayout, QSpinBox, QPushButton
+from PySide6.QtWidgets import QLabel, QStatusBar, QComboBox, QWidget, QVBoxLayout, QFileDialog, QDateEdit
 from PySide6.QtCore import Qt
 from PySide6 import QtPrintSupport, QtGui, QtCore, QtSql
 
@@ -50,14 +50,31 @@ class MainWindow(QMainWindow):
         self.modelSKU = ModelSKU()
         self.tvSKU.setModel(self.modelSKU)
         self.tvSKU.setSelectionBehavior(self.tvSKU.SelectionBehavior.SelectRows)
-        # self.tvSKU.hideColumn(0)
-        # self.tvSKU.hideColumn(4)
         self.refreshSKU()
-        # hh = self.tvSKU.horizontalHeader()
-        # hh.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
-        # hh.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        # hv = self.tvSKU.verticalHeader()
-        # hv.hide()
+
+        lblDate = QLabel('Дата: ')
+        self.deDate = QDateEdit()
+        self.deDate.setMinimumWidth(300)
+
+        lblCount = QLabel('Количество: ')
+        self.sbCount = QSpinBox()
+        self.sbCount.setMinimumWidth(300)
+
+        layHDateDate = QHBoxLayout()
+        layHDateDate.addWidget(lblDate)
+        layHDateDate.addWidget(self.deDate)
+        layHDateDate.addWidget(lblCount)
+        layHDateDate.addWidget(self.sbCount)
+        layHDateDate.setAlignment(Qt.AlignmentFlag.AlignLeft)
+
+
+        # layHCountCount = QHBoxLayout()
+        # layHCountCount.addWidget(lblCount)
+        # layHCountCount.addWidget(self.sbCount)
+        # layHCountCount.setAlignment(Qt.AlignmentFlag.AlignLeft)
+
+        btnPrint = QPushButton('Печать')
+
 
         # self.cbSelectPrinter = QComboBox()
         # self.cbSelectPrinter.addItems(QtPrintSupport.QPrinterInfo.availablePrinterNames())
@@ -79,6 +96,9 @@ class MainWindow(QMainWindow):
         layV.addWidget(lblSelectPrinter)
         layV.addWidget(self.cbSelectGroup)
         layV.addWidget(self.tvSKU)
+        layV.addLayout(layHDateDate)
+        # layV.addLayout(layHCountCount)
+        layV.addWidget(btnPrint)
         # layV.addWidget(self.cbSelectPrinter)
         # layV.addWidget(self.tePrintInfo)
         # layV.addWidget(self.ppwMain)
