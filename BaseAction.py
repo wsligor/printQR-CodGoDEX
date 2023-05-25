@@ -28,6 +28,12 @@ class BaseAction(QAction):
         self.load_file.setToolTip('Загрузить файл с кодами')
         # self.load_file.triggered.connect(self.load_file_triggered)
 
+        self.setup = QAction(QIcon('icons\\setup.png'), 'Настройка', self)
+        self.setup.setStatusTip('Настроить программу')
+        self.setup.setToolTip('Настроить программу')
+
+
+
     def about_qt_triggered(self):
         QMessageBox.aboutQt(self)
 

@@ -67,14 +67,7 @@ class MainWindow(QMainWindow):
         layHDateDate.addWidget(self.sbCount)
         layHDateDate.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
-
-        # layHCountCount = QHBoxLayout()
-        # layHCountCount.addWidget(lblCount)
-        # layHCountCount.addWidget(self.sbCount)
-        # layHCountCount.setAlignment(Qt.AlignmentFlag.AlignLeft)
-
         btnPrint = QPushButton('Печать')
-
 
         # self.cbSelectPrinter = QComboBox()
         # self.cbSelectPrinter.addItems(QtPrintSupport.QPrinterInfo.availablePrinterNames())
