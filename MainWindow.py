@@ -1,43 +1,17 @@
+import os
+import sqlite3 as sl
+
 from PySide6.QtSql import QSqlQueryModel
-from PySide6.QtWidgets import QMainWindow, QDialog, QTableView, QHeaderView
-from PySide6.QtWidgets import QLabel, QStatusBar, QTextEdit, QComboBox, QPushButton, QWidget, QVBoxLayout
+from PySide6.QtWidgets import QMainWindow, QDialog, QTableView, QHeaderView, QFileDialog
+from PySide6.QtWidgets import QLabel, QStatusBar, QComboBox, QWidget, QVBoxLayout
 from PySide6.QtCore import Qt
 from PySide6 import QtPrintSupport, QtGui, QtCore, QtSql
 
 from MainMenu import MainMenu
+from ModelSKU import ModelSKU
 from ToolBar import ToolBar
 
-class ModelSKU(QSqlQueryModel):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-
-        self.modelRefreshSKU()
-        self.setHeaderData(0, Qt.Orientation.Horizontal, 'GTIN')
-        self.setHeaderData(1, Qt.Orientation.Horizontal, 'Наименование')
-        self.setHeaderData(2, Qt.Orientation.Horizontal, 'Количество')
-
-    def modelRefreshSKU(self, id_groups=None):
-        match id_groups:
-            case id_groups if id_groups == None:
-                sql = '''SELECT gtin, name, COUNT(id_sku) as codes 
-                            FROM sku LEFT OUTER JOIN codes 
-                            ON (sku.id = codes.id_sku) 
-                            GROUP BY name
-                '''
-            case 17:
-                sql = '''SELECT gtin, name, COUNT(id_sku) as codes 
-                            FROM sku LEFT OUTER JOIN codes 
-                            ON (sku.id = codes.id_sku) 
-                            GROUP BY name
-                '''
-            case _:
-                sql = f'''SELECT gtin, name, COUNT(id_sku) as codes 
-                            FROM sku LEFT OUTER JOIN codes 
-                            ON (sku.id = codes.id_sku) 
-                            WHERE sku.id_groups = {id_groups}
-                            GROUP BY name
-                '''
-        self.setQuery(sql)
+import prerare
 
 
 class ModelSelectGroup(QSqlQueryModel):
@@ -56,8 +30,10 @@ class MainWindow(QMainWindow):
         self.resize(800, 900)
 
         main_menu = MainMenu(self)
+        main_menu.load_file.triggered.connect(self.load_file_triggered)
         self.setMenuBar(main_menu)
         tool_bar = ToolBar(parent=self)
+        tool_bar.load_file.triggered.connect(self.load_file_triggered)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, tool_bar)
         self.statusbar = QStatusBar()
         self.setStatusBar(self.statusbar)
@@ -113,6 +89,34 @@ class MainWindow(QMainWindow):
         container.setLayout(layV)
         self.centralWidget()
         self.setCentralWidget(container)
+
+    def load_file_triggered(self):
+        filename: str = QFileDialog.getOpenFileName(self, 'Открыть файл', os.getcwd(), 'PDF files (*.pdf)')[0]
+        filelist = filename.split('_')
+        print(filelist[3])
+        list_cod = prerare.convertPdfToJpg(filename)
+        print(len(list_cod))
+        # query = QtSql.QSqlQuery()
+        sql = f'SELECT id FROM sku WHERE gtin = "{filelist[3]}"'
+        con = sl.connect('SFMDEX.db')
+        cur = con.cursor()
+        cur.execute(sql)
+        row = cur.fetchone()
+        id_sku = row[0]
+        list_cod_to_BD = []
+        for cod in list_cod:
+            str_list_cod = (id_sku, cod, 0, 1)
+            list_cod_to_BD.append(str_list_cod)
+        print(list_cod_to_BD)
+        sql = '''INSERT INTO codes(id_sku, cod, print, id_party) values(?,?,?,?)'''
+        cur.executemany(sql, list_cod_to_BD)
+        con.commit()
+        con.close()
+        print('all')
+        self.modelSKU.modelRefreshSKU()
+
+    # def rmSKU(self):
+    #     self.modelSKU.modelRefreshSKU(id_groups=None)
 
     def refreshSKU(self):
         hh = self.tvSKU.horizontalHeader()
