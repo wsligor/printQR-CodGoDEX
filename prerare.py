@@ -1,18 +1,9 @@
 import os
 import fitz
+
 from typing import Tuple
-
 from PIL import Image as ImagePIL
-from PIL import ImageEnhance as ImageEnhancePIL
-
 from pylibdmtx.pylibdmtx import decode
-from pylibdmtx.pylibdmtx import encode
-
-# from pylibdmtx.pylibdmtx import decode
-
-# Настройки для 120 этикеток
-# CROP_RESIZE_WIDTH = 60
-# CROP_RESIZE_HEIGHT = 60
 
 CROP_RESIZE_WIDTH = 40
 CROP_RESIZE_HEIGHT = 40
@@ -27,129 +18,9 @@ QR_IN = (
     (880, 1162, 1012, 1294)
 )
 
-SY = 295  # step Y
-SX = 488  # step X
-SPY = 205  # start position Y
-SPX = 173  # start position X
-
-QR_OUT_220 = (
-    # 1-0
-    (SPX, SPY), (SPX + SX, SPY), (SPX + SX * 2, SPY), (SPX + SX * 3, SPY), (SPX + SX * 4, SPY),
-    (SPX + SX * 5, SPY), (SPX + SX * 6, SPY), (SPX + SX * 7, SPY), (SPX + SX * 8, SPY), (SPX + SX * 9, SPY),  # 1
-    # 2-0
-    (SPX, SPY + SY), (SPX + SX, SPY + SY), (SPX + SX * 2, SPY + SY), (SPX + SX * 3, SPY + SY), (SPX + SX * 4, SPY + SY),
-    (SPX + SX * 5, SPY + SY), (SPX + SX * 6, SPY + SY), (SPX + SX * 7, SPY + SY), (SPX + SX * 8, SPY + SY),
-    (SPX + SX * 9, SPY + SY),  # 2
-    # 3-0
-    (SPX, SPY + SY * 2), (SPX + SX, SPY + SY * 2), (SPX + SX * 2, SPY + SY * 2), (SPX + SX * 3, SPY + SY * 2),
-    (SPX + SX * 4, SPY + SY * 2),
-    (SPX + SX * 5, SPY + SY * 2), (SPX + SX * 6, SPY + SY * 2), (SPX + SX * 7, SPY + SY * 2),
-    (SPX + SX * 8, SPY + SY * 2), (SPX + SX * 9, SPY + SY * 2),  # 3
-    # 4-0
-    (SPX, SPY + SY * 3), (SPX + SX, SPY + SY * 3), (SPX + SX * 2, SPY + SY * 3), (SPX + SX * 3, SPY + SY * 3),
-    (SPX + SX * 4, SPY + SY * 3),
-    (SPX + SX * 5, SPY + SY * 3), (SPX + SX * 6, SPY + SY * 3), (SPX + SX * 7, SPY + SY * 3),
-    (SPX + SX * 8, SPY + SY * 3), (SPX + SX * 9, SPY + SY * 3),  # 4
-    # 5-0
-    (SPX, SPY + SY * 4), (SPX + SX, SPY + SY * 4), (SPX + SX * 2, SPY + SY * 4), (SPX + SX * 3, SPY + SY * 4),
-    (SPX + SX * 4, SPY + SY * 4),
-    (SPX + SX * 5, SPY + SY * 4), (SPX + SX * 6, SPY + SY * 4), (SPX + SX * 7, SPY + SY * 4),
-    (SPX + SX * 8, SPY + SY * 4), (SPX + SX * 9, SPY + SY * 4),  # 5
-    # 6-0
-    (SPX, SPY + SY * 5), (SPX + SX, SPY + SY * 5), (SPX + SX * 2, SPY + SY * 5), (SPX + SX * 3, SPY + SY * 5),
-    (SPX + SX * 4, SPY + SY * 5),
-    (SPX + SX * 5, SPY + SY * 5), (SPX + SX * 6, SPY + SY * 5), (SPX + SX * 7, SPY + SY * 5),
-    (SPX + SX * 8, SPY + SY * 5), (SPX + SX * 9, SPY + SY * 5),  # 6
-    # 7-0
-    (SPX, SPY + SY * 6), (SPX + SX, SPY + SY * 6), (SPX + SX * 2, SPY + SY * 6), (SPX + SX * 3, SPY + SY * 6),
-    (SPX + SX * 4, SPY + SY * 6),
-    (SPX + SX * 5, SPY + SY * 6), (SPX + SX * 6, SPY + SY * 6), (SPX + SX * 7, SPY + SY * 6),
-    (SPX + SX * 8, SPY + SY * 6), (SPX + SX * 9, SPY + SY * 6),  # 7
-    # 8-1
-    (SPX, SPY + SY * 7 - 1), (SPX + SX, SPY + SY * 7 - 1), (SPX + SX * 2, SPY + SY * 7 - 1),
-    (SPX + SX * 3, SPY + SY * 7 - 1), (SPX + SX * 4, SPY + SY * 7 - 1),
-    (SPX + SX * 5, SPY + SY * 7 - 1), (SPX + SX * 6, SPY + SY * 7 - 1), (SPX + SX * 7, SPY + SY * 7 - 1),
-    (SPX + SX * 8, SPY + SY * 7 - 1), (SPX + SX * 9, SPY + SY * 7 - 1),  # 8
-    # 9-1
-    (SPX, SPY + SY * 8 - 1), (SPX + SX, SPY + SY * 8 - 1), (SPX + SX * 2, SPY + SY * 8 - 1),
-    (SPX + SX * 3, SPY + SY * 8 - 1), (SPX + SX * 4, SPY + SY * 8 - 1),
-    (SPX + SX * 5, SPY + SY * 8 - 1), (SPX + SX * 6, SPY + SY * 8 - 1), (SPX + SX * 7, SPY + SY * 8 - 1),
-    (SPX + SX * 8, SPY + SY * 8 - 1), (SPX + SX * 9, SPY + SY * 8 - 1),  # 9
-    # 10-1
-    (SPX, SPY + SY * 9 - 1), (SPX + SX, SPY + SY * 9 - 1), (SPX + SX * 2, SPY + SY * 9 - 1),
-    (SPX + SX * 3, SPY + SY * 9 - 1), (SPX + SX * 4, SPY + SY * 9 - 1),
-    (SPX + SX * 5, SPY + SY * 9 - 1), (SPX + SX * 6, SPY + SY * 9 - 1), (SPX + SX * 7, SPY + SY * 9 - 1),
-    (SPX + SX * 8, SPY + SY * 9 - 1), (SPX + SX * 9, SPY + SY * 9 - 1),  # 10
-    # 11-2
-    (SPX, SPY + SY * 10 - 2), (SPX + SX, SPY + SY * 10 - 2), (SPX + SX * 2, SPY + SY * 10 - 2),
-    (SPX + SX * 3, SPY + SY * 10 - 2), (SPX + SX * 4, SPY + SY * 10 - 2),
-    (SPX + SX * 5, SPY + SY * 10 - 2), (SPX + SX * 6, SPY + SY * 10 - 2), (SPX + SX * 7, SPY + SY * 10 - 2),
-    (SPX + SX * 8, SPY + SY * 10 - 2), (SPX + SX * 9, SPY + SY * 10 - 2),  # 11
-    # 12-2
-    (SPX, SPY + SY * 11 - 2), (SPX + SX, SPY + SY * 11 - 2), (SPX + SX * 2, SPY + SY * 11 - 2),
-    (SPX + SX * 3, SPY + SY * 11 - 2), (SPX + SX * 4, SPY + SY * 11 - 2),
-    (SPX + SX * 5, SPY + SY * 11 - 2), (SPX + SX * 6, SPY + SY * 11 - 2), (SPX + SX * 7, SPY + SY * 11 - 2),
-    (SPX + SX * 8, SPY + SY * 11 - 2), (SPX + SX * 9, SPY + SY * 11 - 2),  # 12
-    # 13-2
-    (SPX, SPY + SY * 12 - 2), (SPX + SX, SPY + SY * 12 - 2), (SPX + SX * 2, SPY + SY * 12 - 2),
-    (SPX + SX * 3, SPY + SY * 12 - 2), (SPX + SX * 4, SPY + SY * 12 - 2),
-    (SPX + SX * 5, SPY + SY * 12 - 2), (SPX + SX * 6, SPY + SY * 12 - 2), (SPX + SX * 7, SPY + SY * 12 - 2),
-    (SPX + SX * 8, SPY + SY * 12 - 2), (SPX + SX * 9, SPY + SY * 12 - 2),  # 13
-    # 14-2
-    (SPX, SPY + SY * 13 - 2), (SPX + SX, SPY + SY * 13 - 2), (SPX + SX * 2, SPY + SY * 13 - 2),
-    (SPX + SX * 3, SPY + SY * 13 - 2), (SPX + SX * 4, SPY + SY * 13 - 2),
-    (SPX + SX * 5, SPY + SY * 13 - 2), (SPX + SX * 6, SPY + SY * 13 - 2), (SPX + SX * 7, SPY + SY * 13 - 2),
-    (SPX + SX * 8, SPY + SY * 13 - 2), (SPX + SX * 9, SPY + SY * 13 - 2),  # 14
-    # 15-2
-    (SPX, SPY + SY * 14 - 2), (SPX + SX, SPY + SY * 14 - 2), (SPX + SX * 2, SPY + SY * 14 - 2),
-    (SPX + SX * 3, SPY + SY * 14 - 2), (SPX + SX * 4, SPY + SY * 14 - 2),
-    (SPX + SX * 5, SPY + SY * 14 - 2), (SPX + SX * 6, SPY + SY * 14 - 2), (SPX + SX * 7, SPY + SY * 14 - 2),
-    (SPX + SX * 8, SPY + SY * 14 - 2), (SPX + SX * 9, SPY + SY * 14 - 2),  # 15
-    # 16-3
-    (SPX, SPY + SY * 15 - 3), (SPX + SX, SPY + SY * 15 - 3), (SPX + SX * 2, SPY + SY * 15 - 3),
-    (SPX + SX * 3, SPY + SY * 15 - 3), (SPX + SX * 4, SPY + SY * 15 - 3),
-    (SPX + SX * 5, SPY + SY * 15 - 3), (SPX + SX * 6, SPY + SY * 15 - 3), (SPX + SX * 7, SPY + SY * 15 - 3),
-    (SPX + SX * 8, SPY + SY * 15 - 3), (SPX + SX * 9, SPY + SY * 15 - 3),  # 16
-    # 17-3
-    (SPX, SPY + SY * 16 - 3), (SPX + SX, SPY + SY * 16 - 3), (SPX + SX * 2, SPY + SY * 16 - 3),
-    (SPX + SX * 3, SPY + SY * 16 - 3), (SPX + SX * 4, SPY + SY * 16 - 3),
-    (SPX + SX * 5, SPY + SY * 16 - 3), (SPX + SX * 6, SPY + SY * 16 - 3), (SPX + SX * 7, SPY + SY * 16 - 3),
-    (SPX + SX * 8, SPY + SY * 16 - 3), (SPX + SX * 9, SPY + SY * 16 - 3),  # 17
-    # 18-3
-    (SPX, SPY + SY * 17 - 3), (SPX + SX, SPY + SY * 17 - 3), (SPX + SX * 2, SPY + SY * 17 - 3),
-    (SPX + SX * 3, SPY + SY * 17 - 3), (SPX + SX * 4, SPY + SY * 17 - 3),
-    (SPX + SX * 5, SPY + SY * 17 - 3), (SPX + SX * 6, SPY + SY * 17 - 3), (SPX + SX * 7, SPY + SY * 17 - 3),
-    (SPX + SX * 8, SPY + SY * 17 - 3), (SPX + SX * 9, SPY + SY * 17 - 3),  # 18
-    # 19-3
-    (SPX, SPY + SY * 18 - 3), (SPX + SX, SPY + SY * 18 - 3), (SPX + SX * 2, SPY + SY * 18 - 3),
-    (SPX + SX * 3, SPY + SY * 18 - 3), (SPX + SX * 4, SPY + SY * 18 - 3),
-    (SPX + SX * 5, SPY + SY * 18 - 3), (SPX + SX * 6, SPY + SY * 18 - 3), (SPX + SX * 7, SPY + SY * 18 - 3),
-    (SPX + SX * 8, SPY + SY * 18 - 3), (SPX + SX * 9, SPY + SY * 18 - 3),  # 19
-    # 20-4
-    (SPX, SPY + SY * 19 - 3), (SPX + SX, SPY + SY * 19 - 3), (SPX + SX * 2, SPY + SY * 19 - 3),
-    (SPX + SX * 3, SPY + SY * 19 - 3), (SPX + SX * 4, SPY + SY * 19 - 3),
-    (SPX + SX * 5, SPY + SY * 19 - 3), (SPX + SX * 6, SPY + SY * 19 - 3), (SPX + SX * 7, SPY + SY * 19 - 3),
-    (SPX + SX * 8, SPY + SY * 19 - 3), (SPX + SX * 9, SPY + SY * 19 - 3),  # 20
-    # 21-4
-    (SPX, SPY + SY * 20 - 3), (SPX + SX, SPY + SY * 20 - 3), (SPX + SX * 2, SPY + SY * 20 - 3),
-    (SPX + SX * 3, SPY + SY * 20 - 3), (SPX + SX * 4, SPY + SY * 20 - 3),
-    (SPX + SX * 5, SPY + SY * 20 - 3), (SPX + SX * 6, SPY + SY * 20 - 3), (SPX + SX * 7, SPY + SY * 20 - 3),
-    (SPX + SX * 8, SPY + SY * 20 - 3), (SPX + SX * 9, SPY + SY * 20 - 3),  # 21
-    # 22-5
-    (SPX, SPY + SY * 21 - 3), (SPX + SX, SPY + SY * 21 - 3), (SPX + SX * 2, SPY + SY * 21 - 3),
-    (SPX + SX * 3, SPY + SY * 21 - 3), (SPX + SX * 4, SPY + SY * 21 - 3),
-    (SPX + SX * 5, SPY + SY * 21 - 3), (SPX + SX * 6, SPY + SY * 21 - 3), (SPX + SX * 7, SPY + SY * 21 - 3),
-    (SPX + SX * 8, SPY + SY * 21 - 3), (SPX + SX * 9, SPY + SY * 21 - 3),  # 22
-)
-
-
-# Press Shift+F10 to execute it or replace it with your code.
-# Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
-
 def block(count_page):
     list_cod = []
     num_page = 1
-
     for y in range(count_page):
         for i in range(20):
             # TODO (ИСПОЛНЕНО) перенести временные jpg файлы в папку temp
@@ -157,21 +28,20 @@ def block(count_page):
             img = ImagePIL.open(filename)
             img.load()
             crop_img = img.crop(QR_IN[i])
-            # crop_img.save('crop_img.jpg')
             data = decode(crop_img)
             list_cod.append(data[0].data)
             # encoded = encode(data[0].data, scheme='', size='20x20')
             # img_encoded = ImagePIL.frombytes('RGB', (encoded.width, encoded.height), encoded.pixels)
             # img_encoded.save('img_encoded.jpg')
         num_page += 1
-
+        # TODO убрать заглушку для полной загрузки
+        break
     return list_cod
 
 
 def convert_pdf2img(input_file: str, pages: Tuple = None):
     """Преобразует PDF в изображение и создает файл за страницей"""
     # Open the document
-
     pdf_in = fitz.open(input_file)
     output_files = []
     i = 0
@@ -202,15 +72,7 @@ def convert_pdf2img(input_file: str, pages: Tuple = None):
         output_files.append(output_file)
         count_page = i
     pdf_in.close()
-    # summary = {
-    #    "Исходный файл": input_file, "Страниц": str(pages), "Выходной файл(ы)": str(output_files)
-    # }
-    # Printing Summary
-    # print("#### Отчет ########################################################")
-    # print("\n".join("{}:{}".format(i, j) for i, j in summary.items()))
-    # print("###################################################################")
     return count_page
-
 
 def convertPdfToJpg(name):
     count_page = convert_pdf2img(name)

@@ -11,18 +11,32 @@ class ModelSKU(QSqlQueryModel):
     def __init__(self, parent=None):
         super().__init__(parent)
 
-        self.refreshSKU()
-        self.setHeaderData(1, Qt.Orientation.Horizontal, 'GTIN')
-        self.setHeaderData(2, Qt.Orientation.Horizontal, 'Наименование')
+        self.modelRefreshSKU()
+        self.setHeaderData(0, Qt.Orientation.Horizontal, 'GTIN')
+        self.setHeaderData(1, Qt.Orientation.Horizontal, 'Наименование')
+        self.setHeaderData(2, Qt.Orientation.Horizontal, 'Количество')
 
-    def refreshSKU(self, id_groups=None):
+    def modelRefreshSKU(self, id_groups=None):
         match id_groups:
             case id_groups if id_groups == None:
-                sql = 'SELECT * FROM sku'
+                sql = '''SELECT gtin, name, COUNT(id_sku) as codes 
+                            FROM sku LEFT OUTER JOIN codes 
+                            ON (sku.id = codes.id_sku) 
+                            GROUP BY name
+                '''
             case 17:
-                sql = 'SELECT * FROM sku'
+                sql = '''SELECT gtin, name, COUNT(id_sku) as codes 
+                            FROM sku LEFT OUTER JOIN codes 
+                            ON (sku.id = codes.id_sku) 
+                            GROUP BY name
+                '''
             case _:
-                sql = f'SELECT * FROM sku WHERE id_groups = {id_groups}'
+                sql = f'''SELECT gtin, name, COUNT(id_sku) as codes 
+                            FROM sku LEFT OUTER JOIN codes 
+                            ON (sku.id = codes.id_sku) 
+                            WHERE sku.id_groups = {id_groups}
+                            GROUP BY name
+                '''
         self.setQuery(sql)
 
 
@@ -60,8 +74,8 @@ class MainWindow(QMainWindow):
         self.modelSKU = ModelSKU()
         self.tvSKU.setModel(self.modelSKU)
         self.tvSKU.setSelectionBehavior(self.tvSKU.SelectionBehavior.SelectRows)
-        self.tvSKU.hideColumn(0)
-        self.tvSKU.hideColumn(3)
+        # self.tvSKU.hideColumn(0)
+        # self.tvSKU.hideColumn(4)
         self.refreshSKU()
         # hh = self.tvSKU.horizontalHeader()
         # hh.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
@@ -103,7 +117,7 @@ class MainWindow(QMainWindow):
     def refreshSKU(self):
         hh = self.tvSKU.horizontalHeader()
         hh.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
-        hh.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        hh.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         hv = self.tvSKU.verticalHeader()
         hv.hide()
 
@@ -118,8 +132,8 @@ class MainWindow(QMainWindow):
             query.first()
             i = query.value('id')
             print(i)
-        self.modelSKU.refreshSKU(i)
-        self.refreshSKU()
+        self.modelSKU.modelRefreshSKU(i)
+        # self.refreshSKU()
 
 
     def btnPrintClicked(self):

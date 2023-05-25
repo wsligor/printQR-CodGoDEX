@@ -1,5 +1,7 @@
 import os
+import sqlite3 as sl
 
+from PySide6 import QtSql
 from PySide6.QtGui import QAction, QIcon
 from PySide6.QtWidgets import QMessageBox, QFileDialog
 
@@ -36,9 +38,26 @@ class BaseAction(QAction):
         QMessageBox.about(self, title, text)
 
     def load_file_triggered(self):
-        print('load_file_triggered')
-        filename = QFileDialog.getOpenFileName(self, 'Открыть файл', os.getcwd(), 'PDF files (*.pdf)')[0]
-        print(filename)
+        filename: str = QFileDialog.getOpenFileName(self, 'Открыть файл', os.getcwd(), 'PDF files (*.pdf)')[0]
+        filelist = filename.split('_')
+        print(filelist[3])
         list_cod = prerare.convertPdfToJpg(filename)
         print(len(list_cod))
+        # query = QtSql.QSqlQuery()
+        sql = f'SELECT id FROM sku WHERE gtin = "{filelist[3]}"'
+        con = sl.connect('SFMDEX.db')
+        cur = con.cursor()
+        cur.execute(sql)
+        row = cur.fetchone()
+        id_sku = row[0]
+        list_cod_to_BD = []
+        for cod in list_cod:
+            str_list_cod = (id_sku, cod, 0, 1)
+            list_cod_to_BD.append(str_list_cod)
+        print(list_cod_to_BD)
+        sql = '''INSERT INTO codes(id_sku, cod, print, id_party) values(?,?,?,?)'''
+        cur.executemany(sql, list_cod_to_BD)
+        con.commit()
+        con.close()
+        print('all')
 
