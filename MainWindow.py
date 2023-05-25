@@ -1,11 +1,39 @@
-from PySide6.QtWidgets import QMainWindow, QDialog
+from PySide6.QtSql import QSqlQueryModel
+from PySide6.QtWidgets import QMainWindow, QDialog, QTableView, QHeaderView
 from PySide6.QtWidgets import QLabel, QStatusBar, QTextEdit, QComboBox, QPushButton, QWidget, QVBoxLayout
 from PySide6.QtCore import Qt
-from PySide6 import QtPrintSupport, QtGui, QtCore
+from PySide6 import QtPrintSupport, QtGui, QtCore, QtSql
 
 from MainMenu import MainMenu
 from ToolBar import ToolBar
 
+class ModelSKU(QSqlQueryModel):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        self.refreshSKU()
+        self.setHeaderData(1, Qt.Orientation.Horizontal, 'GTIN')
+        self.setHeaderData(2, Qt.Orientation.Horizontal, 'Наименование')
+
+    def refreshSKU(self, id_groups=None):
+        match id_groups:
+            case id_groups if id_groups == None:
+                sql = 'SELECT * FROM sku'
+            case 17:
+                sql = 'SELECT * FROM sku'
+            case _:
+                sql = f'SELECT * FROM sku WHERE id_groups = {id_groups}'
+        self.setQuery(sql)
+
+
+class ModelSelectGroup(QSqlQueryModel):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.refreshSelectGroup()
+
+    def refreshSelectGroup(self):
+        sql = 'SELECT name, id FROM groups ORDER BY sort'
+        self.setQuery(sql)
 
 class MainWindow(QMainWindow):
     def __init__(self, parent=None):
@@ -21,34 +49,78 @@ class MainWindow(QMainWindow):
         self.setStatusBar(self.statusbar)
 
         layV = QVBoxLayout()
-        lblSelectPrinter = QLabel('Выберите принтер:')
-        self.cbSelectPrinter = QComboBox()
-        self.cbSelectPrinter.addItems(QtPrintSupport.QPrinterInfo.availablePrinterNames())
-        self.cbSelectPrinter.currentTextChanged[str].connect(self.showData)
+        lblSelectPrinter = QLabel('Выберите группу:')
 
-        self.tePrintInfo = QTextEdit()
-        self.tePrintInfo.setReadOnly(True)
-        self.showData(self.cbSelectPrinter.currentText())
+        self.cbSelectGroup = QComboBox()
+        self.modelSelectGrop = ModelSelectGroup()
+        self.cbSelectGroup.setModel(self.modelSelectGrop)
+        self.cbSelectGroup.currentTextChanged.connect(self.cbSelectGroup_currentTextChanged)
 
-        self.printer = QtPrintSupport.QPrinter()
-        # self.printer.setPageSize(QtCore.QSize(95, 57))
-        self.ppwMain = QtPrintSupport.QPrintPreviewWidget(self.printer, parent=self)
-        print(f'printer.PageRect = {self.printer.pageRect}')
-        self.ppwMain.paintRequested.connect(self._PaintImage)
+        self.tvSKU = QTableView()
+        self.modelSKU = ModelSKU()
+        self.tvSKU.setModel(self.modelSKU)
+        self.tvSKU.setSelectionBehavior(self.tvSKU.SelectionBehavior.SelectRows)
+        self.tvSKU.hideColumn(0)
+        self.tvSKU.hideColumn(3)
+        self.refreshSKU()
+        # hh = self.tvSKU.horizontalHeader()
+        # hh.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        # hh.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        # hv = self.tvSKU.verticalHeader()
+        # hv.hide()
 
-        btnPrint = QPushButton('Печать')
-        btnPrint.clicked.connect(self.btnPrintClicked)
-
+        # self.cbSelectPrinter = QComboBox()
+        # self.cbSelectPrinter.addItems(QtPrintSupport.QPrinterInfo.availablePrinterNames())
+        # self.cbSelectPrinter.currentTextChanged[str].connect(self.showData)
+        #
+        # self.tePrintInfo = QTextEdit()
+        # self.tePrintInfo.setReadOnly(True)
+        # self.showData(self.cbSelectPrinter.currentText())
+        #
+        # self.printer = QtPrintSupport.QPrinter()
+        # # self.printer.setPageSize(QtCore.QSize(95, 57))
+        # self.ppwMain = QtPrintSupport.QPrintPreviewWidget(self.printer, parent=self)
+        # print(f'printer.PageRect = {self.printer.pageRect}')
+        # self.ppwMain.paintRequested.connect(self._PaintImage)
+        #
+        # btnPrint = QPushButton('Печать')
+        # btnPrint.clicked.connect(self.btnPrintClicked)
+        #
         layV.addWidget(lblSelectPrinter)
-        layV.addWidget(self.cbSelectPrinter)
-        layV.addWidget(self.tePrintInfo)
-        layV.addWidget(self.ppwMain)
-        layV.addWidget(btnPrint)
+        layV.addWidget(self.cbSelectGroup)
+        layV.addWidget(self.tvSKU)
+        # layV.addWidget(self.cbSelectPrinter)
+        # layV.addWidget(self.tePrintInfo)
+        # layV.addWidget(self.ppwMain)
+        # layV.addWidget(btnPrint)
+        layV.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         container = QWidget()
         container.setLayout(layV)
         self.centralWidget()
         self.setCentralWidget(container)
+
+    def refreshSKU(self):
+        hh = self.tvSKU.horizontalHeader()
+        hh.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        hh.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        hv = self.tvSKU.verticalHeader()
+        hv.hide()
+
+
+    def cbSelectGroup_currentTextChanged(self, name):
+        print(name)
+        sql = f'SELECT id FROM groups WHERE name = "{name}"'
+        print(sql)
+        query = QtSql.QSqlQuery()
+        query.exec(sql)
+        if query.isActive():
+            query.first()
+            i = query.value('id')
+            print(i)
+        self.modelSKU.refreshSKU(i)
+        self.refreshSKU()
+
 
     def btnPrintClicked(self):
         pd = QtPrintSupport.QPrintDialog(self.printer, parent=self)

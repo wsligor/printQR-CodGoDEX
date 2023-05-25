@@ -9,9 +9,11 @@ class MainMenu(QMenuBar, BaseAction):
     def __init__(self, parent=None):
         super().__init__(parent)
 
-        help_menu = QMenu("&Help", self)
+        service_menu = QMenu("Service", self)
+        service_menu.addAction(self.load_file)
+        self.addMenu(service_menu)
 
+        help_menu = QMenu("&Help", self)
         help_menu.addAction(self.about_qt)
         help_menu.addAction(self.about)
-
         self.addMenu(help_menu)

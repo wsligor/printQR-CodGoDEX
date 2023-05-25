@@ -10,6 +10,7 @@ class ToolBar(QToolBar, BaseAction):
 
         self.setMovable(False)
 
+        self.addAction(self.load_file)
         self.addAction(self.about_qt)
         self.addAction(self.about)
 
