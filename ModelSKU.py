@@ -15,21 +15,23 @@ class ModelSKU(QSqlQueryModel):
         match id_groups:
             case id_groups if id_groups == None:
                 sql = '''SELECT gtin, name, COUNT(id_sku) as codes 
-                            FROM sku LEFT OUTER JOIN codes 
-                            ON (sku.id = codes.id_sku) 
+                            FROM sku LEFT OUTER JOIN codes
+                            ON (sku.id = codes.id_sku)
+                            WHERE codes.print = 0                               
                             GROUP BY name
                 '''
             case 17:
                 sql = '''SELECT gtin, name, COUNT(id_sku) as codes 
                             FROM sku LEFT OUTER JOIN codes 
                             ON (sku.id = codes.id_sku) 
+                            WHERE codes.print = 0
                             GROUP BY name
                 '''
             case _:
                 sql = f'''SELECT gtin, name, COUNT(id_sku) as codes 
                             FROM sku LEFT OUTER JOIN codes 
                             ON (sku.id = codes.id_sku) 
-                            WHERE sku.id_groups = {id_groups}
+                            WHERE sku.id_groups = {id_groups} AND codes.print = 0
                             GROUP BY name
                 '''
         self.setQuery(sql)

@@ -1,10 +1,17 @@
 import os
+import datetime
+from datetime import date
 import sqlite3 as sl
+from PIL import Image, ImageFilter, ImageEnhance, ImageFont, ImageDraw
+
+from pylibdmtx.pylibdmtx import decode
+from pylibdmtx.pylibdmtx import encode
 
 from PySide6.QtSql import QSqlQueryModel
+from PySide6.QtWidgets import QMessageBox
 from PySide6.QtWidgets import QMainWindow, QDialog, QTableView, QHeaderView, QHBoxLayout, QSpinBox, QPushButton
 from PySide6.QtWidgets import QLabel, QStatusBar, QComboBox, QWidget, QVBoxLayout, QFileDialog, QDateEdit
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QDateTime, QModelIndex
 from PySide6 import QtPrintSupport, QtGui, QtCore, QtSql
 
 from MainMenu import MainMenu
@@ -39,7 +46,7 @@ class MainWindow(QMainWindow):
         self.setStatusBar(self.statusbar)
 
         layV = QVBoxLayout()
-        lblSelectPrinter = QLabel('Выберите группу:')
+        lblSelectGroup = QLabel('Выберите группу:')
 
         self.cbSelectGroup = QComboBox()
         self.modelSelectGrop = ModelSelectGroup()
@@ -55,6 +62,7 @@ class MainWindow(QMainWindow):
         lblDate = QLabel('Дата: ')
         self.deDate = QDateEdit()
         self.deDate.setMinimumWidth(300)
+        self.deDate.setDate(date.today())
 
         lblCount = QLabel('Количество: ')
         self.sbCount = QSpinBox()
@@ -68,29 +76,23 @@ class MainWindow(QMainWindow):
         layHDateDate.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
         btnPrint = QPushButton('Печать')
+        btnPrint.clicked.connect(self.btnPrint_clicked)
 
-        # self.cbSelectPrinter = QComboBox()
-        # self.cbSelectPrinter.addItems(QtPrintSupport.QPrinterInfo.availablePrinterNames())
-        # self.cbSelectPrinter.currentTextChanged[str].connect(self.showData)
-        #
-        # self.tePrintInfo = QTextEdit()
-        # self.tePrintInfo.setReadOnly(True)
-        # self.showData(self.cbSelectPrinter.currentText())
-        #
-        # self.printer = QtPrintSupport.QPrinter()
-        # # self.printer.setPageSize(QtCore.QSize(95, 57))
-        # self.ppwMain = QtPrintSupport.QPrintPreviewWidget(self.printer, parent=self)
-        # print(f'printer.PageRect = {self.printer.pageRect}')
-        # self.ppwMain.paintRequested.connect(self._PaintImage)
-        #
-        # btnPrint = QPushButton('Печать')
-        # btnPrint.clicked.connect(self.btnPrintClicked)
-        #
-        layV.addWidget(lblSelectPrinter)
+        lblSelectPrinter = QLabel('Выберите принтер: ')
+        self.cbSelectPrinter = QComboBox()
+        self.cbSelectPrinter.addItems(QtPrintSupport.QPrinterInfo.availablePrinterNames())
+        self.cbSelectPrinter.currentTextChanged[str].connect(self.showData)
+        layHLabelSelectPrinter = QHBoxLayout()
+        layHLabelSelectPrinter.addWidget(lblSelectPrinter)
+        layHLabelSelectPrinter.addWidget(self.cbSelectPrinter)
+        layHLabelSelectPrinter.setAlignment(Qt.AlignmentFlag.AlignLeft)
+
+        layV.addWidget(lblSelectGroup)
         layV.addWidget(self.cbSelectGroup)
         layV.addWidget(self.tvSKU)
         layV.addLayout(layHDateDate)
         # layV.addLayout(layHCountCount)
+        layV.addLayout(layHLabelSelectPrinter)
         layV.addWidget(btnPrint)
         # layV.addWidget(self.cbSelectPrinter)
         # layV.addWidget(self.tePrintInfo)
@@ -103,30 +105,114 @@ class MainWindow(QMainWindow):
         self.centralWidget()
         self.setCentralWidget(container)
 
-    def load_file_triggered(self):
-        filename: str = QFileDialog.getOpenFileName(self, 'Открыть файл', os.getcwd(), 'PDF files (*.pdf)')[0]
-        filelist = filename.split('_')
-        print(filelist[3])
-        list_cod = prerare.convertPdfToJpg(filename)
-        print(len(list_cod))
-        # query = QtSql.QSqlQuery()
-        sql = f'SELECT id FROM sku WHERE gtin = "{filelist[3]}"'
+    def btnPrint_clicked(self):
+        print('btnPrint_clicked')
+        # TODO убрать заглушку для контроля даты количества
+        dt = datetime.datetime.strptime(self.deDate.text(), "%d.%m.%Y")
+        current_date = datetime.datetime.today() - datetime.timedelta(days=1)
+        if dt < current_date:
+            QMessageBox.critical(self, 'Внимание', 'Измените дату')
+        if int(self.sbCount.text()) == 0:
+            QMessageBox.critical(self, 'Внимание', 'Введите количество')
+
+        printer = QtPrintSupport.QPrinter(mode=QtPrintSupport.QPrinter.PrinterMode.PrinterResolution)
+        painter = QtGui.QPainter()
+        page_size = QtGui.QPageSize(QtCore.QSize(120, 57))
+        printer.setPageSize(page_size)
+        painter.begin(printer)
+
+        # self.sbCount.setValue(2)
+
+        n = self.tvSKU.currentIndex().row()
+        p = self.tvSKU.model().index(n, 0).data()
+        print(p)
+        con = sl.connect('SFMDEX.db')
+        cur = con.cursor()
+        sql = f'SELECT id FROM sku WHERE gtin = "{p}"'
+        cur.execute(sql)
+        id_sku = cur.fetchone()
+        print(id_sku[0])
+        sql = f"SELECT cod, id FROM codes WHERE id_sku = {id_sku[0]} AND print = 0 ORDER BY date_load LIMIT {int(self.sbCount.text())}"
+        cur.execute(sql)
+        codes_bd = cur.fetchall()
+        for cod in codes_bd:
+
+            encoded = encode(cod[0], scheme='', size='20x20')
+            sql = f'''UPDATE codes SET print = 1 WHERE id = "{cod[1]}"'''
+            cur.execute(sql)
+            con.commit()
+
+            img_encod = Image.frombytes('RGB', (encoded.width, encoded.height), encoded.pixels)
+            img_encoded = img_encod.resize((160, 160))
+            img_filter = img_encoded.filter(ImageFilter.EDGE_ENHANCE)
+            img_filter.save('img_filter.png')
+
+            enhancer = ImageEnhance.Contrast(img_filter)
+            factor = 50
+            enhancer_output = enhancer.enhance(factor)
+            enhancer_output.save('enhancer_output.png')
+
+            img_encoded.save('img_encoded.png')
+
+            img = Image.new('RGB', (454, 238), 'white')
+            img_cod = Image.open('enhancer_output.png')
+            img.paste(img_cod, (5, 5))
+            font = ImageFont.truetype('ARIALNBI.TTF', size=50)
+            dtext = ImageDraw.Draw(img)
+            dtext.text((170, 40), self.deDate.text(), font=font, fill=('#1C0606'))
+            dtext.text((170, 100), 'СМТ 001', font=font, fill=('#1C0606'))
+            img.save('crop_img_cod.png')
+
+            page_size = printer.pageRect(QtPrintSupport.QPrinter.Unit.DevicePixel)
+            page_width = int(page_size.width())
+            page_heigth = int(page_size.height())
+            pixmap = QtGui.QPixmap('crop_img_cod.png')
+            pixmap = pixmap.scaled(page_width, page_heigth, aspectMode=QtCore.Qt.AspectRatioMode.KeepAspectRatio)
+            painter.drawPixmap(-45, 40, pixmap)
+            printer.newPage()
+
+        painter.end()
+        con.close()
+        self.modelSKU.modelRefreshSKU()
+
+    def checkingFileUpload(self, filename):
+        sql = f'''SELECT COUNT(name) FROM file_load WHERE name = "{filename}"'''
         con = sl.connect('SFMDEX.db')
         cur = con.cursor()
         cur.execute(sql)
+        row  = cur.fetchone()
+        if row[0] == 0:
+            return False
+        else:
+            return True
+
+    def load_file_triggered(self):
+        con = sl.connect('SFMDEX.db')
+        cur = con.cursor()
+        filename: str = QFileDialog.getOpenFileName(self, 'Открыть файл', os.getcwd(), 'PDF files (*.pdf)')[0]
+        fn = os.path.basename(filename)
+        if self.checkingFileUpload(fn):
+            QMessageBox.critical(self, 'Внимание', 'Этот файл уже загружен в БД')
+            return
+        filelist = filename.split('_')
+        list_cod = prerare.convertPdfToJpg(filename)
+        sql = f'SELECT id FROM sku WHERE gtin = "{filelist[3]}"'
+        cur.execute(sql)
         row = cur.fetchone()
         id_sku = row[0]
+        dateToday = date.today()
         list_cod_to_BD = []
         for cod in list_cod:
-            str_list_cod = (id_sku, cod, 0, 1)
+            str_list_cod = (id_sku, cod, 0, 1, dateToday)
             list_cod_to_BD.append(str_list_cod)
-        print(list_cod_to_BD)
-        sql = '''INSERT INTO codes(id_sku, cod, print, id_party) values(?,?,?,?)'''
+        sql = '''INSERT INTO codes(id_sku, cod, print, id_party, date_load) values(?,?,?,?,?)'''
         cur.executemany(sql, list_cod_to_BD)
+        sql = f'''INSERT INTO file_load (name) values("{fn}")'''
+        cur.execute(sql)
         con.commit()
         con.close()
-        print('all')
         self.modelSKU.modelRefreshSKU()
+        QMessageBox.information(self, 'Все', 'Все')
 
     # def rmSKU(self):
     #     self.modelSKU.modelRefreshSKU(id_groups=None)
