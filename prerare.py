@@ -75,6 +75,8 @@ def convert_pdf2img(input_file: str, pages: Tuple = None):
     return count_page
 
 def convertPdfToJpg(name):
+    # TODO Оптимизировать загрузку картинок из pdf файла
+    # https: // dev - -gang - ru.turbopages.org / dev - gang.ru / s / article / rabota - s - pdf - failami - v - python - cztenie - i - razbor - 06 mta2spn0 /
     count_page = convert_pdf2img(name)
     return block(count_page)
 

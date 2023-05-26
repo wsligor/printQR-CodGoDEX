@@ -107,7 +107,7 @@ class MainWindow(QMainWindow):
 
     def btnPrint_clicked(self):
         print('btnPrint_clicked')
-        # TODO убрать заглушку для контроля даты количества
+        # TODO Полный рефакторинг функции
         dt = datetime.datetime.strptime(self.deDate.text(), "%d.%m.%Y")
         current_date = datetime.datetime.today() - datetime.timedelta(days=1)
         if dt < current_date:
@@ -115,13 +115,12 @@ class MainWindow(QMainWindow):
         if int(self.sbCount.text()) == 0:
             QMessageBox.critical(self, 'Внимание', 'Введите количество')
 
+        # TODO Проверка принтера !!!
         printer = QtPrintSupport.QPrinter(mode=QtPrintSupport.QPrinter.PrinterMode.PrinterResolution)
         painter = QtGui.QPainter()
         page_size = QtGui.QPageSize(QtCore.QSize(120, 57))
         printer.setPageSize(page_size)
         painter.begin(printer)
-
-        # self.sbCount.setValue(2)
 
         n = self.tvSKU.currentIndex().row()
         p = self.tvSKU.model().index(n, 0).data()
@@ -160,6 +159,8 @@ class MainWindow(QMainWindow):
             font = ImageFont.truetype('ARIALNBI.TTF', size=50)
             dtext = ImageDraw.Draw(img)
             dtext.text((170, 40), self.deDate.text(), font=font, fill=('#1C0606'))
+            # TODO получить номера партионного учета
+            # ввести соотвествующий учет
             dtext.text((170, 100), 'СМТ 001', font=font, fill=('#1C0606'))
             img.save('crop_img_cod.png')
 
@@ -214,8 +215,6 @@ class MainWindow(QMainWindow):
         self.modelSKU.modelRefreshSKU()
         QMessageBox.information(self, 'Все', 'Все')
 
-    # def rmSKU(self):
-    #     self.modelSKU.modelRefreshSKU(id_groups=None)
 
     def refreshSKU(self):
         hh = self.tvSKU.horizontalHeader()
