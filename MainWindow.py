@@ -142,8 +142,8 @@ class MainWindow(QMainWindow):
             con.commit()
 
             img_encod = Image.frombytes('RGB', (encoded.width, encoded.height), encoded.pixels)
-            img_encoded = img_encod.resize((160, 160))
-            img_filter = img_encoded.filter(ImageFilter.EDGE_ENHANCE)
+            # img_encoded = img_encod.resize((120, 120))
+            img_filter = img_encod.filter(ImageFilter.EDGE_ENHANCE)
             img_filter.save('img_filter.png')
 
             enhancer = ImageEnhance.Contrast(img_filter)
@@ -151,25 +151,26 @@ class MainWindow(QMainWindow):
             enhancer_output = enhancer.enhance(factor)
             enhancer_output.save('enhancer_output.png')
 
-            img_encoded.save('img_encoded.png')
+            img_encod.save('img_encoded.png')
 
             img = Image.new('RGB', (454, 238), 'white')
             img_cod = Image.open('enhancer_output.png')
             img.paste(img_cod, (5, 5))
-            font = ImageFont.truetype('ARIALNBI.TTF', size=50)
+            font = ImageFont.truetype('ARIALNBI.TTF', size=40)
             dtext = ImageDraw.Draw(img)
-            dtext.text((170, 40), self.deDate.text(), font=font, fill=('#1C0606'))
+            dtext.text((130, 20), self.deDate.text(), font=font, fill=('#1C0606'))
             # TODO получить номера партионного учета
             # ввести соотвествующий учет
-            dtext.text((170, 100), 'СМТ 001', font=font, fill=('#1C0606'))
+            dtext.text((130, 80), 'СМТ25-025 ', font=font, fill=('#1C0606'))
             img.save('crop_img_cod.png')
 
             page_size = printer.pageRect(QtPrintSupport.QPrinter.Unit.DevicePixel)
             page_width = int(page_size.width())
             page_heigth = int(page_size.height())
             pixmap = QtGui.QPixmap('crop_img_cod.png')
+            # pixmap = QtGui.QPixmap('enhancer_output.png')
             pixmap = pixmap.scaled(page_width, page_heigth, aspectMode=QtCore.Qt.AspectRatioMode.KeepAspectRatio)
-            painter.drawPixmap(-45, 40, pixmap)
+            painter.drawPixmap(20, 50, pixmap)
             printer.newPage()
 
         painter.end()
@@ -330,7 +331,8 @@ class MainWindow(QMainWindow):
         s += "Поддерживаемые режимы цветной печати: " + s2 + "\n\n"
         s2 = ", ".join([str(r) for r in printer.supportedResolutions()])
         s += "Поддерживаемые разрешения, точек/дюйм: " + s2
-        self.tePrintInfo.setText(s)
+        self.cbSelectPrinter.setCurrentText(s)
+        # self.tePrintInfo.setText(s)
 
     @staticmethod
     def _getDuplexModeName(ident):

@@ -35,7 +35,6 @@ def block(count_page):
             # img_encoded.save('img_encoded.jpg')
         num_page += 1
         # TODO убрать заглушку для полной загрузки
-        break
     return list_cod
 
 
