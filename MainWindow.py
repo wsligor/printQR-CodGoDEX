@@ -189,6 +189,7 @@ class MainWindow(QMainWindow):
             return True
 
     def load_file_triggered(self):
+        # TODO проверить gtin в базе если нет выдать предупреждение
         con = sl.connect('SFMDEX.db')
         cur = con.cursor()
         filename: str = QFileDialog.getOpenFileName(self, 'Открыть файл', os.getcwd(), 'PDF files (*.pdf)')[0]

@@ -18,15 +18,16 @@ QR_IN = (
     (880, 1162, 1012, 1294)
 )
 
-def block(count_page):
+def block(count_page, count):
     list_cod = []
     num_page = 1
     for y in range(count_page):
         for i in range(20):
+        # for i in range(int(count)-1):
             # TODO (ИСПОЛНЕНО) перенести временные jpg файлы в папку temp
             filename = os.getcwd() + '\\tmp\\order' + str(num_page) + '.jpg'
             img = ImagePIL.open(filename)
-            img.load()
+            # img.load()
             crop_img = img.crop(QR_IN[i])
             data = decode(crop_img)
             list_cod.append(data[0].data)
@@ -77,5 +78,8 @@ def convertPdfToJpg(name):
     # TODO Оптимизировать загрузку картинок из pdf файла
     # https: // dev - -gang - ru.turbopages.org / dev - gang.ru / s / article / rabota - s - pdf - failami - v - python - cztenie - i - razbor - 06 mta2spn0 /
     count_page = convert_pdf2img(name)
-    return block(count_page)
+    pname = name.split('_')
+    count = pname[5]
+    count_cod = count.split('.')
+    return block(count_page, count_cod[0])
 
