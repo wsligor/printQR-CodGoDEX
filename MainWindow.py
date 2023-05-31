@@ -66,6 +66,7 @@ class MainWindow(QMainWindow):
 
         lblCount = QLabel('Количество: ')
         self.sbCount = QSpinBox()
+        self.sbCount.setValue(1)
         self.sbCount.setMinimumWidth(300)
 
         layHDateDate = QHBoxLayout()
@@ -117,6 +118,7 @@ class MainWindow(QMainWindow):
 
         # TODO Проверка принтера !!!
         printer = QtPrintSupport.QPrinter(mode=QtPrintSupport.QPrinter.PrinterMode.PrinterResolution)
+
         painter = QtGui.QPainter()
         page_size = QtGui.QPageSize(QtCore.QSize(120, 57))
         printer.setPageSize(page_size)
@@ -127,13 +129,36 @@ class MainWindow(QMainWindow):
         print(p)
         con = sl.connect('SFMDEX.db')
         cur = con.cursor()
-        sql = f'SELECT id FROM sku WHERE gtin = "{p}"'
+        sql = f'SELECT id, prefix FROM sku WHERE gtin = "{p}"'
         cur.execute(sql)
         id_sku = cur.fetchone()
-        print(id_sku[0])
+        print(id_sku[0], id_sku[1])
+        sql = f'''SELECT count(prefix) FROM party WHERE prefix = "{id_sku[1]}" GROUP BY prefix'''
+        cur.execute(sql)
+        record = cur.fetchone()
+        if not record:
+            nameParty: str = id_sku[1] + '-' + '001'
+            dateParty = self.deDate.text()
+            sql = f'''INSERT INTO party (name, date, prefix, number) VALUES ("{nameParty}", "{dateParty}", "{id_sku[1]}", 1)'''
+        else:
+            num: int = 1 + record[0]
+            numberParty = str(num)
+            prefixParty = id_sku[1]
+            numberParty = numberParty.zfill(3)
+            nameParty = prefixParty + '-' + numberParty
+            print(numberParty, nameParty)
+            dateParty = self.deDate.text()
+            sql = f'''INSERT INTO party (name, date, prefix, number) VALUES ("{nameParty}", "{dateParty}", "{prefixParty}", {num})'''
+        cur.execute(sql)
+        con.commit()
+
+
         sql = f"SELECT cod, id FROM codes WHERE id_sku = {id_sku[0]} AND print = 0 ORDER BY date_load LIMIT {int(self.sbCount.text())}"
         cur.execute(sql)
         codes_bd = cur.fetchall()
+
+        i: int = 0
+
         for cod in codes_bd:
 
             encoded = encode(cod[0], scheme='', size='20x20')
@@ -158,10 +183,13 @@ class MainWindow(QMainWindow):
             img.paste(img_cod, (5, 5))
             font = ImageFont.truetype('ARIALNBI.TTF', size=40)
             dtext = ImageDraw.Draw(img)
-            dtext.text((130, 20), self.deDate.text(), font=font, fill=('#1C0606'))
+            dtext.text((130, 25), self.deDate.text(), font=font, fill=('#1C0606'))
             # TODO получить номера партионного учета
             # ввести соотвествующий учет
-            dtext.text((130, 80), 'СМТ25-025 ', font=font, fill=('#1C0606'))
+            dtext.text((130, 80), nameParty, font=font, fill=('#1C0606'))
+            i += 1
+            dtext.text((130, -10), str(i), font=font, fill=('#1C0606'))
+
             img.save('crop_img_cod.png')
 
             page_size = printer.pageRect(QtPrintSupport.QPrinter.Unit.DevicePixel)
