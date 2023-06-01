@@ -160,7 +160,6 @@ class MainWindow(QMainWindow):
         i: int = 0
 
         for cod in codes_bd:
-
             encoded = encode(cod[0], scheme='', size='20x20')
             sql = f'''UPDATE codes SET print = 1 WHERE id = "{cod[1]}"'''
             cur.execute(sql)
