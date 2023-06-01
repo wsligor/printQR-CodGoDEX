@@ -139,7 +139,7 @@ class MainWindow(QMainWindow):
         if not record:
             nameParty: str = id_sku[1] + '-' + '001'
             dateParty = self.deDate.text()
-            sql = f'''INSERT INTO party (name, date, prefix, number) VALUES ("{nameParty}", "{dateParty}", "{id_sku[1]}", 1)'''
+            sql = f'''INSERT INTO party (name, date_doc, prefix, number) VALUES ("{nameParty}", "{dateParty}", "{id_sku[1]}", 1)'''
         else:
             num: int = 1 + record[0]
             numberParty = str(num)
@@ -148,7 +148,7 @@ class MainWindow(QMainWindow):
             nameParty = prefixParty + '-' + numberParty
             print(numberParty, nameParty)
             dateParty = self.deDate.text()
-            sql = f'''INSERT INTO party (name, date, prefix, number) VALUES ("{nameParty}", "{dateParty}", "{prefixParty}", {num})'''
+            sql = f'''INSERT INTO party (name, date_doc, prefix, number) VALUES ("{nameParty}", "{dateParty}", "{prefixParty}", {num})'''
         cur.execute(sql)
         con.commit()
 
