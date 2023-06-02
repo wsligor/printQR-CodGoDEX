@@ -33,7 +33,7 @@ class ModelSelectGroup(QSqlQueryModel):
 class MainWindow(QMainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle('Класс QPrinterInfo')
+        self.setWindowTitle('Молочное море - PrintDM - GoDEX530')
         self.resize(800, 900)
 
         main_menu = MainMenu(self)
