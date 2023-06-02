@@ -34,7 +34,7 @@ class MainWindow(QMainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle('Молочное море - PrintDM - GoDEX530')
-        self.resize(800, 900)
+        self.resize(800, 700)
 
         main_menu = MainMenu(self)
         main_menu.load_file.triggered.connect(self.load_file_triggered)
@@ -161,7 +161,7 @@ class MainWindow(QMainWindow):
 
         for cod in codes_bd:
             encoded = encode(cod[0], scheme='', size='20x20')
-            sql = f'''UPDATE codes SET print = 1 WHERE id = "{cod[1]}"'''
+            sql = f'''UPDATE codes SET print = 1, id_party = {num} WHERE id = "{cod[1]}"'''
             cur.execute(sql)
             con.commit()
 
@@ -233,7 +233,7 @@ class MainWindow(QMainWindow):
         dateToday = date.today()
         list_cod_to_BD = []
         for cod in list_cod:
-            str_list_cod = (id_sku, cod, 0, 1, dateToday)
+            str_list_cod = (id_sku, cod, 0, 0, dateToday)
             list_cod_to_BD.append(str_list_cod)
         sql = '''INSERT INTO codes(id_sku, cod, print, id_party, date_load) values(?,?,?,?,?)'''
         cur.executemany(sql, list_cod_to_BD)
