@@ -22,20 +22,13 @@ def block(count_page, count):
     list_cod = []
     num_page = 1
     for y in range(count_page):
+        filename = os.getcwd() + '\\tmp\\order' + str(num_page) + '.jpg'
+        img = ImagePIL.open(filename)
         for i in range(20):
-        # for i in range(int(count)-1):
-            # TODO (ИСПОЛНЕНО) перенести временные jpg файлы в папку temp
-            filename = os.getcwd() + '\\tmp\\order' + str(num_page) + '.jpg'
-            img = ImagePIL.open(filename)
-            # img.load()
             crop_img = img.crop(QR_IN[i])
             data = decode(crop_img)
             list_cod.append(data[0].data)
-            # encoded = encode(data[0].data, scheme='', size='20x20')
-            # img_encoded = ImagePIL.frombytes('RGB', (encoded.width, encoded.height), encoded.pixels)
-            # img_encoded.save('img_encoded.jpg')
         num_page += 1
-        # TODO убрать заглушку для полной загрузки
     return list_cod
 
 
