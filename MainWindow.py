@@ -17,6 +17,7 @@ from PySide6 import QtPrintSupport, QtGui, QtCore, QtSql
 from MainMenu import MainMenu
 from ModelSKU import ModelSKU
 from ToolBar import ToolBar
+from progressBar import dlgProgressBar
 
 import prerare
 
@@ -38,9 +39,11 @@ class MainWindow(QMainWindow):
 
         main_menu = MainMenu(self)
         main_menu.load_file.triggered.connect(self.load_file_triggered)
+        main_menu.load_file_two.triggered.connect(self.load_file_two_triggered)
         self.setMenuBar(main_menu)
         tool_bar = ToolBar(parent=self)
         tool_bar.load_file.triggered.connect(self.load_file_triggered)
+        tool_bar.load_file_two.triggered.connect(self.load_file_two_triggered)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, tool_bar)
         self.statusbar = QStatusBar()
         self.setStatusBar(self.statusbar)
@@ -105,6 +108,15 @@ class MainWindow(QMainWindow):
         container.setLayout(layV)
         self.centralWidget()
         self.setCentralWidget(container)
+
+    def load_file_two_triggered(self):
+        print('load_file_two.triggered')
+        dlg = dlgProgressBar()
+        list = []
+        dlg.exec()
+        # list_cod = dlg.data
+        # print(list_cod)
+        print('fin')
 
     def btnPrint_clicked(self):
         print('btnPrint_clicked')
@@ -226,7 +238,10 @@ class MainWindow(QMainWindow):
             return
         filelist = filename.split('_')
         list_cod = prerare.convertPdfToJpg(filename)
-        sql = f'SELECT id FROM sku WHERE gtin = "{filelist[3]}"'
+        gtin: str = filelist[3]
+        if not gtin.isnumeric():
+            QMessageBox.critical(self, 'Внимание', 'gtin продукта не найден. Обратитесь к администратору')
+        sql = f'SELECT id FROM sku WHERE gtin = "{gtin}"'
         cur.execute(sql)
         row = cur.fetchone()
         id_sku = row[0]

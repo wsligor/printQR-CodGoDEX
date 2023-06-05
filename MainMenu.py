@@ -11,6 +11,7 @@ class MainMenu(QMenuBar, BaseAction):
 
         service_menu = QMenu("Service", self)
         service_menu.addAction(self.load_file)
+        service_menu.addAction(self.load_file_two)
         service_menu.addAction(self.setup)
         self.addMenu(service_menu)
 
