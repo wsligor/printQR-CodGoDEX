@@ -34,8 +34,9 @@ QR_IN = (
 
 class threadCodJpgDecode(QThread):
     running = False
-    execSignalOne = QtCore.Signal()
-    finishedSignalOne = QtCore.Signal(list)
+    signalStart = QtCore.Signal(int)
+    signalExec = QtCore.Signal()
+    signalFinished = QtCore.Signal(list)
 
     # method which will execute algorithm in another thread
     def __init__(self, fileList):
@@ -43,7 +44,8 @@ class threadCodJpgDecode(QThread):
         self.fileList = fileList
 
     def run(self):
-        self.fileList =  os.listdir(os.getcwd() + '\\tmp\\')
+        self.fileList = os.listdir(os.getcwd() + '\\tmp\\')
+        self.signalStart.emit(len(self.fileList))
         list_cod = []
         for f in self.fileList:
             filename = os.getcwd() + '\\tmp\\' + f
@@ -52,7 +54,7 @@ class threadCodJpgDecode(QThread):
                 crop_img = img.crop(QR_IN[i])
                 data = decode(crop_img)
                 list_cod.append(data[0].data)
-            self.execSignalOne.emit()
+            self.signalExec.emit()
         # self.finishedSignalOne.emit(list_cod)
 
 class ModelSelectGroup(QSqlQueryModel):
@@ -146,47 +148,51 @@ class MainWindow(QMainWindow):
         print('load_file_two.triggered')
 
         self.threadOne = threadCodJpgDecode('t')
-        self.threadOne.execSignalOne.connect(self.threadExecOne)
+        self.threadOne.signalStart.connect(self.threadStartOne)
+        self.threadOne.signalExec.connect(self.threadExecOne)
         self.threadOne.finished.connect(self.threadFinishedOne)
         self.threadOne.start()
 
     @QtCore.Slot()
+    def threadStartOne(self, l):
+        self.statusbar.showMessage('Загрузка кодов в БД ...')
+        self.progressBar.setMaximum(l)
+
+
+    @QtCore.Slot()
     def threadExecOne(self):
-            self.countProgress += 1
-            self.progressBar.setValue(self.countProgress)
+        self.countProgress += 1
+        self.progressBar.setValue(self.countProgress)
+        self.statusbar.showMessage('Загрузка кодов в БД ...')
 
     @QtCore.Slot()
     def threadFinishedOne(self):
         self.progressBar.setValue(0)
         self.countProgress = 0
+        self.statusbar.showMessage('Завершено')
 
     def btnPrint_clicked(self):
-        print('btnPrint_clicked')
         # TODO Полный рефакторинг функции
         dt = datetime.datetime.strptime(self.deDate.text(), "%d.%m.%Y")
         current_date = datetime.datetime.today() - datetime.timedelta(days=1)
         if dt < current_date:
             QMessageBox.critical(self, 'Внимание', 'Измените дату')
+            return
         if int(self.sbCount.text()) == 0:
             QMessageBox.critical(self, 'Внимание', 'Введите количество')
-
-        # TODO Проверка принтера !!!
-        printer = QtPrintSupport.QPrinter(mode=QtPrintSupport.QPrinter.PrinterMode.PrinterResolution)
-
-        painter = QtGui.QPainter()
-        page_size = QtGui.QPageSize(QtCore.QSize(120, 57))
-        printer.setPageSize(page_size)
-        painter.begin(printer)
+            return
 
         n = self.tvSKU.currentIndex().row()
         p = self.tvSKU.model().index(n, 0).data()
-        print(p)
+        if n == -1:
+            QMessageBox.information(self, 'Внимание', 'Выделите строку для печати')
+            return
+
         con = sl.connect('SFMDEX.db')
         cur = con.cursor()
         sql = f'SELECT id, prefix FROM sku WHERE gtin = "{p}"'
         cur.execute(sql)
         id_sku = cur.fetchone()
-        print(id_sku[0], id_sku[1])
         sql = f'''SELECT count(prefix) FROM party WHERE prefix = "{id_sku[1]}" GROUP BY prefix'''
         cur.execute(sql)
         record = cur.fetchone()
@@ -206,6 +212,13 @@ class MainWindow(QMainWindow):
         cur.execute(sql)
         con.commit()
 
+        # TODO Проверка принтера !!!
+        printer = QtPrintSupport.QPrinter(mode=QtPrintSupport.QPrinter.PrinterMode.PrinterResolution)
+
+        painter = QtGui.QPainter()
+        page_size = QtGui.QPageSize(QtCore.QSize(120, 57))
+        printer.setPageSize(page_size)
+        painter.begin(printer)
 
         sql = f"SELECT cod, id FROM codes WHERE id_sku = {id_sku[0]} AND print = 0 ORDER BY date_load LIMIT {int(self.sbCount.text())}"
         cur.execute(sql)
