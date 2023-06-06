@@ -23,59 +23,50 @@ QR_IN = (
 class BrowserHandlerOne(QtCore.QObject):
     running = False
     newTextAndColorOne = QtCore.Signal()
-    finishedSignal = QtCore.Signal()
+    finishedSignalOne = QtCore.Signal(list)
 
     # method which will execute algorithm in another thread
-    def __init__(self, count_page):
+    def __init__(self, fileList):
         super().__init__()
-        self.count_page = count_page
+        self.fileList = fileList
 
     def run(self):
-        print(self.count_page)
-        # count_page = 11
+        print(self.fileList)
         list_cod = []
-        # for y in range(1, self.count_page+1, 2):
-        for y in range(1, 10-1):
-            filename = os.getcwd() + '\\tmp\\order' + str(y) + '.jpg'
-            print(filename)
-            # img = ImagePIL.open(filename)
+        for f in self.fileList:
+            filename = os.getcwd() + '\\tmp\\' + f
+            img = ImagePIL.open(filename)
             for i in range(20):
-                # crop_img = img.crop(QR_IN[i])
-                # data = decode(crop_img)
-                # list_cod.append(data[0].data)
-                print(i)
+                crop_img = img.crop(QR_IN[i])
+                data = decode(crop_img)
+                list_cod.append(data[0].data)
             self.newTextAndColorOne.emit()
-        print('t1')
-        self.finishedSignal.emit()
-
+        print(f't1 = {list_cod}')
+        self.finishedSignalOne.emit(list_cod)
 
 class BrowserHandlerTwo(QtCore.QObject):
     running = False
     newTextAndColorTwo = QtCore.Signal()
-    finishedSignal = QtCore.Signal()
+    finishedSignalTwo = QtCore.Signal(list)
 
-    def __init__(self, count_page):
+    def __init__(self, fileList):
         super().__init__()
-        self.count_page = count_page
+        self.fileList = fileList
 
     # method which will execute algorithm in another thread
     def run(self):
-        print(self.count_page)
-        # count_page = 11
+        print(self.fileList)
         list_cod = []
-        # for y in range(2, self.count_page+1, 2):
-        for y in range(10):
-            # filename = os.getcwd() + '\\tmp\\order' + str(y) + '.jpg'
-            # img = ImagePIL.open(filename)
-            print('y')
+        for f in self.fileList:
+            filename = os.getcwd() + '\\tmp\\' + f
+            img = ImagePIL.open(filename)
             for i in range(20):
-                # crop_img = img.crop(QR_IN[i])
-                # data = decode(crop_img)
-                # list_cod.append(data[0].data)
-                print(x)
+                crop_img = img.crop(QR_IN[i])
+                data = decode(crop_img)
+                list_cod.append(data[0].data)
             self.newTextAndColorTwo.emit()
-        print('t2')
-        self.finishedSignal.emit()
+        print(f't2 = {list_cod}')
+        self.finishedSignalTwo.emit(list_cod)
 
 
 class dlgProgressBar(QDialog):
@@ -85,16 +76,24 @@ class dlgProgressBar(QDialog):
         self.countProgress = 0
 
         self.progressBar = QProgressBar()
-        self.progressBar.setMaximum(10)
+        self.progressBar.setMaximum(8)
         self.lblInfo = QLabel('Идет подготовка файлов...')
         layV = QVBoxLayout(self)
         layV.addWidget(self.progressBar)
         layV.addWidget(self.lblInfo)
+        self.setLayout(layV)
 
+        files = os.listdir(os.getcwd() + '\\tmp\\')
+        print(files)
+        half = len(files)//2
+        partOne = files[:half]
+        print(partOne)
+        partTwo = files[half:]
+        print(partTwo)
         # create thread
         self.threadOne = QtCore.QThread()
         # create object which will be moved to another thread
-        self.browserHandlerOne = BrowserHandlerOne(11)
+        self.browserHandlerOne = BrowserHandlerOne(partOne)
         # move object to another thread
         self.browserHandlerOne.moveToThread(self.threadOne)
         # after that, we can connect signals from this object to slot in GUI thread
@@ -103,27 +102,29 @@ class dlgProgressBar(QDialog):
         self.threadOne.started.connect(self.browserHandlerOne.run)
 
         self.threadTwo = QtCore.QThread()
-        self.browserHandlerTwo = BrowserHandlerTwo(11)
+        self.browserHandlerTwo = BrowserHandlerTwo(partTwo)
         self.browserHandlerTwo.moveToThread(self.threadTwo)
         self.browserHandlerTwo.newTextAndColorTwo.connect(self.addNewTextAndColorTwo)
-        self.browserHandlerTwo.finishedSignal.connect(self.threadFinished)
+        self.browserHandlerTwo.finishedSignalTwo.connect(self.threadFinishedOne)
         self.threadTwo.started.connect(self.browserHandlerTwo.run)
         # start thread
         self.threadOne.start()
-        # self.threadTwo.start()
+        self.threadTwo.start()
 
 
 
-    @QtCore.Slot(int, object)
+    @QtCore.Slot()
     def addNewTextAndColorOne(self):
             self.countProgress += 1
             self.progressBar.setValue(self.countProgress)
 
-    @QtCore.Slot(int, object)
+    @QtCore.Slot()
     def addNewTextAndColorTwo(self):
             self.countProgress += 1
             self.progressBar.setValue(self.countProgress)
 
-    def threadFinished(self):
-        print('1')
-        # self.accept()
+    @QtCore.Slot()
+    def threadFinishedOne(self, cod):
+        self.data = self.data + cod
+        print(self.data)
+        self.accept()

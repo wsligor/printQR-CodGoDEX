@@ -3,15 +3,16 @@ import datetime
 from datetime import date
 import sqlite3 as sl
 from PIL import Image, ImageFilter, ImageEnhance, ImageFont, ImageDraw
+from PIL import Image as ImagePIL
 
 from pylibdmtx.pylibdmtx import decode
 from pylibdmtx.pylibdmtx import encode
 
 from PySide6.QtSql import QSqlQueryModel
-from PySide6.QtWidgets import QMessageBox
+from PySide6.QtWidgets import QMessageBox, QProgressBar
 from PySide6.QtWidgets import QMainWindow, QDialog, QTableView, QHeaderView, QHBoxLayout, QSpinBox, QPushButton
 from PySide6.QtWidgets import QLabel, QStatusBar, QComboBox, QWidget, QVBoxLayout, QFileDialog, QDateEdit
-from PySide6.QtCore import Qt, QDateTime, QModelIndex
+from PySide6.QtCore import Qt, QDateTime, QModelIndex, QThread
 from PySide6 import QtPrintSupport, QtGui, QtCore, QtSql
 
 from MainMenu import MainMenu
@@ -21,6 +22,37 @@ from progressBar import dlgProgressBar
 
 import prerare
 
+
+QR_IN = (
+    (38, 88, 170, 220), (248, 88, 380, 220), (458, 88, 590, 220), (668, 88, 798, 220), (880, 88, 1012, 220),
+    (38, 446, 170, 578), (248, 446, 380, 578), (458, 446, 590, 578), (668, 446, 798, 578), (880, 446, 1012, 578),
+    (38, 804, 170, 936), (248, 804, 380, 936), (458, 804, 590, 936), (668, 804, 798, 936), (880, 804, 1012, 936),
+    (38, 1162, 170, 1294), (248, 1162, 380, 1294), (458, 1162, 590, 1294), (668, 1162, 798, 1294),
+    (880, 1162, 1012, 1294)
+)
+
+
+class threadCodJpgtoList(QThread):
+    running = False
+    execSignalOne = QtCore.Signal()
+    finishedSignalOne = QtCore.Signal(list)
+
+    # method which will execute algorithm in another thread
+    def __init__(self, fileList):
+        super().__init__()
+        self.fileList = fileList
+
+    def run(self):
+        self.fileList =  os.listdir(os.getcwd() + '\\tmp\\')
+        list_cod = []
+        for f in self.fileList:
+            filename = os.getcwd() + '\\tmp\\' + f
+            img = ImagePIL.open(filename)
+            for i in range(20):
+                crop_img = img.crop(QR_IN[i])
+                data = decode(crop_img)
+                list_cod.append(data[0].data)
+            self.execSignalOne.emit()
 
 class ModelSelectGroup(QSqlQueryModel):
     def __init__(self, parent=None):
@@ -36,6 +68,8 @@ class MainWindow(QMainWindow):
         super().__init__(parent)
         self.setWindowTitle('Молочное море - PrintDM - GoDEX530')
         self.resize(800, 700)
+        self.dlg = None
+        self.countProgress = 0
 
         main_menu = MainMenu(self)
         main_menu.load_file.triggered.connect(self.load_file_triggered)
@@ -49,6 +83,8 @@ class MainWindow(QMainWindow):
         self.setStatusBar(self.statusbar)
 
         layV = QVBoxLayout()
+        self.progressBar = QProgressBar()
+        self.progressBar.setMaximum(10)
         lblSelectGroup = QLabel('Выберите группу:')
 
         self.cbSelectGroup = QComboBox()
@@ -91,17 +127,13 @@ class MainWindow(QMainWindow):
         layHLabelSelectPrinter.addWidget(self.cbSelectPrinter)
         layHLabelSelectPrinter.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
+        layV.addWidget(self.progressBar)
         layV.addWidget(lblSelectGroup)
         layV.addWidget(self.cbSelectGroup)
         layV.addWidget(self.tvSKU)
         layV.addLayout(layHDateDate)
-        # layV.addLayout(layHCountCount)
         layV.addLayout(layHLabelSelectPrinter)
         layV.addWidget(btnPrint)
-        # layV.addWidget(self.cbSelectPrinter)
-        # layV.addWidget(self.tePrintInfo)
-        # layV.addWidget(self.ppwMain)
-        # layV.addWidget(btnPrint)
         layV.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         container = QWidget()
@@ -111,12 +143,21 @@ class MainWindow(QMainWindow):
 
     def load_file_two_triggered(self):
         print('load_file_two.triggered')
-        dlg = dlgProgressBar()
-        list = []
-        dlg.exec()
-        # list_cod = dlg.data
-        # print(list_cod)
-        print('fin')
+
+        self.threadOne = threadCodJpgtoList('t')
+        self.threadOne.execSignalOne.connect(self.threadExecOne)
+        self.threadOne.finished.connect(self.threadFinishedOne)
+        self.threadOne.start()
+
+    @QtCore.Slot()
+    def threadExecOne(self):
+            self.countProgress += 1
+            self.progressBar.setValue(self.countProgress)
+
+    @QtCore.Slot()
+    def threadFinishedOne(self):
+        self.progressBar.setValue(0)
+        self.countProgress = 0
 
     def btnPrint_clicked(self):
         print('btnPrint_clicked')
