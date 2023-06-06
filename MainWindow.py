@@ -32,7 +32,7 @@ QR_IN = (
 )
 
 
-class threadCodJpgtoList(QThread):
+class threadCodJpgDecode(QThread):
     running = False
     execSignalOne = QtCore.Signal()
     finishedSignalOne = QtCore.Signal(list)
@@ -53,6 +53,7 @@ class threadCodJpgtoList(QThread):
                 data = decode(crop_img)
                 list_cod.append(data[0].data)
             self.execSignalOne.emit()
+        # self.finishedSignalOne.emit(list_cod)
 
 class ModelSelectGroup(QSqlQueryModel):
     def __init__(self, parent=None):
@@ -144,7 +145,7 @@ class MainWindow(QMainWindow):
     def load_file_two_triggered(self):
         print('load_file_two.triggered')
 
-        self.threadOne = threadCodJpgtoList('t')
+        self.threadOne = threadCodJpgDecode('t')
         self.threadOne.execSignalOne.connect(self.threadExecOne)
         self.threadOne.finished.connect(self.threadFinishedOne)
         self.threadOne.start()
