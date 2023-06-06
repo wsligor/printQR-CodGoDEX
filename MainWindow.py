@@ -196,17 +196,17 @@ class MainWindow(QMainWindow):
         sql = f'''SELECT count(prefix) FROM party WHERE prefix = "{id_sku[1]}" GROUP BY prefix'''
         cur.execute(sql)
         record = cur.fetchone()
+        num: int = 1
         if not record:
             nameParty: str = id_sku[1] + '-' + '001'
             dateParty = self.deDate.text()
-            sql = f'''INSERT INTO party (name, date_doc, prefix, number) VALUES ("{nameParty}", "{dateParty}", "{id_sku[1]}", 1)'''
+            sql = f'''INSERT INTO party (name, date_doc, prefix, number) VALUES ("{nameParty}", "{dateParty}", "{id_sku[1]}", {num})'''
         else:
             num: int = 1 + record[0]
             numberParty = str(num)
             prefixParty = id_sku[1]
             numberParty = numberParty.zfill(3)
             nameParty = prefixParty + '-' + numberParty
-            print(numberParty, nameParty)
             dateParty = self.deDate.text()
             sql = f'''INSERT INTO party (name, date_doc, prefix, number) VALUES ("{nameParty}", "{dateParty}", "{prefixParty}", {num})'''
         cur.execute(sql)
@@ -251,7 +251,7 @@ class MainWindow(QMainWindow):
             dtext = ImageDraw.Draw(img)
             dtext.text((130, 25), self.deDate.text(), font=font, fill=('#1C0606'))
             # TODO получить номера партионного учета
-            # ввести соотвествующий учет
+            # ввести соответствующий учет
             dtext.text((130, 80), nameParty, font=font, fill=('#1C0606'))
             i += 1
             dtext.text((130, -10), str(i), font=font, fill=('#1C0606'))
@@ -260,10 +260,10 @@ class MainWindow(QMainWindow):
 
             page_size = printer.pageRect(QtPrintSupport.QPrinter.Unit.DevicePixel)
             page_width = int(page_size.width())
-            page_heigth = int(page_size.height())
+            page_height = int(page_size.height())
             pixmap = QtGui.QPixmap('crop_img_cod.png')
             # pixmap = QtGui.QPixmap('enhancer_output.png')
-            pixmap = pixmap.scaled(page_width, page_heigth, aspectMode=QtCore.Qt.AspectRatioMode.KeepAspectRatio)
+            pixmap = pixmap.scaled(page_width, page_height, aspectMode=QtCore.Qt.AspectRatioMode.KeepAspectRatio)
             painter.drawPixmap(20, 50, pixmap)
             printer.newPage()
 
