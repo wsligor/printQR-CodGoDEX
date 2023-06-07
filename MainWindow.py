@@ -31,6 +31,11 @@ QR_IN = (
     (880, 1162, 1012, 1294)
 )
 
+def retry(func):
+    def _wraper(*args, **kwargs):
+        func(*args, **kwargs)
+    return _wraper()
+
 class threadCodJpgDecode(QThread):
     running = False
     signalStart = QtCore.Signal(int)
@@ -47,12 +52,13 @@ class threadCodJpgDecode(QThread):
         self.fileList = []
 
     def run(self):
+        workingDirectory = os.getcwd() + '\\tmp\\'
         self.convert_pdf2img(self.fileName)
-        self.fileList = os.listdir(os.getcwd() + '\\tmp\\')
+        self.fileList = os.listdir(workingDirectory)
         self.signalStart.emit(len(self.fileList))
         list_cod = []
         for f in self.fileList:
-            filename = os.getcwd() + '\\tmp\\' + f
+            filename = workingDirectory + f
             img = ImagePIL.open(filename)
             for i in range(20):
                 crop_img = img.crop(QR_IN[i])
