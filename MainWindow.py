@@ -4,6 +4,7 @@ from datetime import date
 import sqlite3 as sl
 from PIL import Image, ImageFilter, ImageEnhance, ImageFont, ImageDraw
 from PIL import Image as ImagePIL
+import fitz
 
 from pylibdmtx.pylibdmtx import decode
 from pylibdmtx.pylibdmtx import encode
@@ -18,7 +19,6 @@ from PySide6 import QtPrintSupport, QtGui, QtCore, QtSql
 from MainMenu import MainMenu
 from ModelSKU import ModelSKU
 from ToolBar import ToolBar
-from progressBar import dlgProgressBar
 
 import prerare
 
@@ -31,7 +31,6 @@ QR_IN = (
     (880, 1162, 1012, 1294)
 )
 
-
 class threadCodJpgDecode(QThread):
     running = False
     signalStart = QtCore.Signal(int)
@@ -39,11 +38,16 @@ class threadCodJpgDecode(QThread):
     signalFinished = QtCore.Signal(list)
 
     # method which will execute algorithm in another thread
-    def __init__(self, fileList):
+    def __init__(self, fileName, id_sku, fn):
         super().__init__()
-        self.fileList = fileList
+        self.fileName = fileName
+        self.id_sku = id_sku
+        self.fn = fn
+        self.fileListCount = 0
+        self.fileList = []
 
     def run(self):
+        self.convert_pdf2img(self.fileName)
         self.fileList = os.listdir(os.getcwd() + '\\tmp\\')
         self.signalStart.emit(len(self.fileList))
         list_cod = []
@@ -55,7 +59,36 @@ class threadCodJpgDecode(QThread):
                 data = decode(crop_img)
                 list_cod.append(data[0].data)
             self.signalExec.emit()
-        # self.finishedSignalOne.emit(list_cod)
+
+        dateToday = date.today()
+        list_cod_to_BD = []
+        for cod in list_cod:
+            str_list_cod = (self.id_sku, cod, 0, 0, dateToday)
+            list_cod_to_BD.append(str_list_cod)
+
+        con = sl.connect('SFMDEX.db')
+        cur = con.cursor()
+        sql = '''INSERT INTO codes(id_sku, cod, print, id_party, date_load) values(?,?,?,?,?)'''
+        cur.executemany(sql, list_cod_to_BD)
+        sql = f'''INSERT INTO file_load (name) values("{self.fn}")'''
+        cur.execute(sql)
+        con.commit()
+        con.close()
+
+    def convert_pdf2img(self, filename: str):
+        """Преобразует PDF в изображение и создает файл за страницей"""
+        pdf_in = fitz.open(filename)
+        i = 0
+        for page in pdf_in:
+            i += 1
+            zoom_x = 2.08
+            zoom_y = 2.08
+            mat = fitz.Matrix(zoom_x, zoom_y)  # .preRotate(rotate)
+            # pix = page.getPixmap(matrix=mat, alpha=False)
+            output_file = os.getcwd() + "\\tmp\\order" + str(i) + ".jpg"
+            pix = page.get_pixmap(matrix=mat)
+            pix.save(output_file)
+        pdf_in.close()
 
 class ModelSelectGroup(QSqlQueryModel):
     def __init__(self, parent=None):
@@ -73,6 +106,7 @@ class MainWindow(QMainWindow):
         self.resize(800, 700)
         self.dlg = None
         self.countProgress = 0
+        self.codes = []
 
         main_menu = MainMenu(self)
         main_menu.load_file.triggered.connect(self.load_file_triggered)
@@ -146,11 +180,32 @@ class MainWindow(QMainWindow):
 
     def load_file_two_triggered(self):
         print('load_file_two.triggered')
+        filename: str = QFileDialog.getOpenFileName(self, 'Открыть файл', os.getcwd(), 'PDF files (*.pdf)')[0]
+        fn = os.path.basename(filename)
+        if self.checkingFileUpload(fn):
+            QMessageBox.critical(self, 'Внимание', 'Этот файл уже загружен в БД')
+            # return
+        filelist = filename.split('_')
+        gtin: str = filelist[3]
+        if not gtin.isnumeric():
+            QMessageBox.critical(self, 'Внимание', 'Нарушен формат наименования файла. Обратитесь к администратору')
+            return
 
-        self.threadOne = threadCodJpgDecode('t')
+        con = sl.connect('SFMDEX.db')
+        cur = con.cursor()
+        sql = f'SELECT id FROM sku WHERE gtin = "{gtin}"'
+        cur.execute(sql)
+        row = cur.fetchone()
+        if row == None:
+            QMessageBox.critical(self, 'Внимание', 'gtin продукта не найден. Обратитесь к администратору')
+            return
+        id_sku = row[0]
+
+        self.threadOne = threadCodJpgDecode(filename, id_sku, fn)
         self.threadOne.signalStart.connect(self.threadStartOne)
         self.threadOne.signalExec.connect(self.threadExecOne)
         self.threadOne.finished.connect(self.threadFinishedOne)
+        # self.threadOne.signalFinished.connect(self.threadFinishedTwo)
         self.threadOne.start()
 
     @QtCore.Slot()
@@ -170,6 +225,7 @@ class MainWindow(QMainWindow):
         self.progressBar.setValue(0)
         self.countProgress = 0
         self.statusbar.showMessage('Завершено')
+        self.modelSKU.modelRefreshSKU()
 
     def btnPrint_clicked(self):
         # TODO Полный рефакторинг функции
@@ -276,7 +332,7 @@ class MainWindow(QMainWindow):
         con = sl.connect('SFMDEX.db')
         cur = con.cursor()
         cur.execute(sql)
-        row  = cur.fetchone()
+        row = cur.fetchone()
         if row[0] == 0:
             return False
         else:
@@ -290,12 +346,13 @@ class MainWindow(QMainWindow):
         fn = os.path.basename(filename)
         if self.checkingFileUpload(fn):
             QMessageBox.critical(self, 'Внимание', 'Этот файл уже загружен в БД')
-            return
+            # return
         filelist = filename.split('_')
         list_cod = prerare.convertPdfToJpg(filename)
         gtin: str = filelist[3]
         if not gtin.isnumeric():
             QMessageBox.critical(self, 'Внимание', 'gtin продукта не найден. Обратитесь к администратору')
+            return
         sql = f'SELECT id FROM sku WHERE gtin = "{gtin}"'
         cur.execute(sql)
         row = cur.fetchone()
@@ -336,7 +393,6 @@ class MainWindow(QMainWindow):
         self.modelSKU.modelRefreshSKU(i)
         # self.refreshSKU()
 
-
     def btnPrintClicked(self):
         pd = QtPrintSupport.QPrintDialog(self.printer, parent=self)
 
@@ -345,7 +401,6 @@ class MainWindow(QMainWindow):
         if pd.exec() == QDialog.DialogCode.Accepted:
             self._PrintImage(self.printer)
         pass
-
 
     def _PaintImage(self, printer):
         painter = QtGui.QPainter()
