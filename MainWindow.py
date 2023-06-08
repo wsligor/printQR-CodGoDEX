@@ -38,10 +38,10 @@ QR_IN_1 = (
     (19, 559, 81, 621), (120, 559, 182, 621), (221, 559, 283, 621), (322, 559, 384, 621), (423, 559, 485, 621)
 )
 
-def retry(func):
-    def _wraper(*args, **kwargs):
-        func(*args, **kwargs)
-    return _wraper()
+# def retry(func):
+#     def _wraper(*args, **kwargs):
+#         func(*args, **kwargs)
+#     return _wraper()
 
 class threadCodJpgDecode(QThread):
     running = False
@@ -111,7 +111,7 @@ class ModelSelectGroup(QSqlQueryModel):
 class MainWindow(QMainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle('Молочное море - PrintDM - GoDEX530')
+        self.setWindowTitle('Молочное море - PrintDM - GoDEX530 - v1.0.1')
         self.resize(800, 700)
         self.dlg = None
         self.countProgress = 0
@@ -130,7 +130,8 @@ class MainWindow(QMainWindow):
 
         layV = QVBoxLayout()
         self.progressBar = QProgressBar()
-        self.progressBar.setMaximum(10)
+        # self.progressBar.setMaximum(10)
+        self.progressBar.setTextVisible(False)
         lblSelectGroup = QLabel('Выберите группу:')
 
         self.cbSelectGroup = QComboBox()
@@ -190,6 +191,8 @@ class MainWindow(QMainWindow):
     def load_file_two_triggered(self):
         # print('load_file_two.triggered')
         filename: str = QFileDialog.getOpenFileName(self, 'Открыть файл', os.getcwd(), 'PDF files (*.pdf)')[0]
+        if not filename: #проверка на пустую строку
+            return
         fn = os.path.basename(filename)
         if self.checkingFileUpload(fn):
             QMessageBox.critical(self, 'Внимание', 'Этот файл уже загружен в БД')
@@ -197,7 +200,7 @@ class MainWindow(QMainWindow):
         filelist = filename.split('_')
         gtin: str = filelist[3]
         if not gtin.isnumeric():
-            QMessageBox.critical(self, 'Внимание', 'Нарушен формат наименования файла. Обратитесь к администратору')
+            QMessageBox.critical(self, 'Внимание', 'Нарушен формат имени файла. Обратитесь к администратору')
             return
 
         con = sl.connect('SFMDEX.db')
@@ -205,7 +208,7 @@ class MainWindow(QMainWindow):
         sql = f'SELECT id FROM sku WHERE gtin = "{gtin}"'
         cur.execute(sql)
         row = cur.fetchone()
-        if row == None:
+        if row is None:
             QMessageBox.critical(self, 'Внимание', 'gtin продукта не найден. Обратитесь к администратору')
             return
         id_sku = row[0]
