@@ -1,4 +1,4 @@
-import os
+import os, shutil
 import datetime
 from datetime import date
 import sqlite3 as sl
@@ -60,6 +60,10 @@ class threadCodJpgDecode(QThread):
 
     def run(self):
         workingDirectory = os.getcwd() + '\\tmp\\'
+        self.fileList = os.listdir(workingDirectory)
+        for file in self.fileList:
+            fullFileName = workingDirectory + file
+            os.remove(fullFileName)
         self.convert_pdf2img(self.fileName)
         self.fileList = os.listdir(workingDirectory)
         self.signalStart.emit(len(self.fileList))
@@ -250,6 +254,7 @@ class MainWindow(QMainWindow):
 
     def btnPrint_clicked(self):
         # TODO Полный рефакторинг функции
+        # TODO Проверить запрашиваемое количество кодов на печать
         printerName = self.cbSelectPrinter.currentText()
         if printerName != 'Godex G530':
             QMessageBox.critical(self, 'Attention', 'Установите принтер для печати этикеток')
@@ -271,9 +276,19 @@ class MainWindow(QMainWindow):
 
         con = sl.connect('SFMDEX.db')
         cur = con.cursor()
+
         sql = f'SELECT id, prefix FROM sku WHERE gtin = "{p}"'
         cur.execute(sql)
         id_sku = cur.fetchone()
+        sql = f'SELECT count(cod) FROM codes WHERE id_sku = {id_sku[0]}'
+        cur.execute(sql)
+        record = cur.fetchone()
+        if self.sbCount.value() > record[0]:
+            QMessageBox.information(self, 'Внимание', 'Загрузите коды, не хватает для печати')
+            return
+
+        return
+
         sql = f'''SELECT count(prefix) FROM party WHERE prefix = "{id_sku[1]}" GROUP BY prefix'''
         cur.execute(sql)
         record = cur.fetchone()
