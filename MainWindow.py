@@ -83,14 +83,14 @@ class threadCodJpgDecode(QThread):
         for cod in list_cod:
             str_list_cod = (self.id_sku, cod, 0, 0, dateToday)
             list_cod_to_BD.append(str_list_cod)
-        # con = sl.connect('SFMDEX.db')
-        # cur = con.cursor()
-        # sql = '''INSERT INTO codes(id_sku, cod, print, id_party, date_load) values(?,?,?,?,?)'''
-        # cur.executemany(sql, list_cod_to_BD)
-        # sql = f'''INSERT INTO file_load (name) values("{self.fn}")'''
-        # cur.execute(sql)
-        # con.commit()
-        # con.close()
+        con = sl.connect('SFMDEX.db')
+        cur = con.cursor()
+        sql = '''INSERT INTO codes(id_sku, cod, print, id_party, date_load) values(?,?,?,?,?)'''
+        cur.executemany(sql, list_cod_to_BD)
+        sql = f'''INSERT INTO file_load (name) values("{self.fn}")'''
+        cur.execute(sql)
+        con.commit()
+        con.close()
         self.signalFinished.emit(len(list_cod_to_BD), defectCodeCount)
 
     def convert_pdf2img(self, filename: str):
@@ -324,17 +324,18 @@ class MainWindow(QMainWindow):
 
             img_encod.save('img_encoded.png')
 
-            img = Image.new('RGB', (454, 238), 'white')
+            img = Image.new('RGB', (300, 156), 'white')
+            # img = Image.new('RGB', (454, 238), 'white')
             img_cod = Image.open('enhancer_output.png')
-            img.paste(img_cod, (5, 5))
+            img.paste(img_cod, (25, -5))
             font = ImageFont.truetype('ARIALNBI.TTF', size=40)
             dtext = ImageDraw.Draw(img)
-            dtext.text((130, 25), self.deDate.text(), font=font, fill=('#1C0606'))
-            # TODO получить номера партионного учета
-            # ввести соответствующий учет
-            dtext.text((130, 80), nameParty, font=font, fill=('#1C0606'))
+            # dtext.text((130, 25), self.deDate.text(), font=font, fill=('#1C0606'))
+            # # TODO получить номера партионного учета
+            # # ввести соответствующий учет
+            # dtext.text((130, 80), nameParty, font=font, fill=('#1C0606'))
             i += 1
-            dtext.text((130, -10), str(i), font=font, fill=('#1C0606'))
+            dtext.text((150, 10), str(i), font=font, fill=('#1C0606'))
 
             img.save('crop_img_cod.png')
 
