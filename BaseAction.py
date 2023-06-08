@@ -11,7 +11,7 @@ class BaseAction(QAction):
         super().__init__(parent)
 
         self.about_qt = QAction(QIcon('icons\\qt.png'), 'О библиотеке Qt', self)
-        self.about_qt.setShortcut('Ctrl+Q')
+        # self.about_qt.setShortcut('Ctrl+Q')
         self.about_qt.setStatusTip('Показать "О библиотеке Qt"')
         self.about_qt.setToolTip('Показать "О библиотеке Qt"')
         self.about_qt.triggered.connect(self.about_qt_triggered)
@@ -26,6 +26,12 @@ class BaseAction(QAction):
         # self.load_file.setShortcut('Alt+Q')
         self.load_file.setStatusTip('Загрузить файл с кодами')
         self.load_file.setToolTip('Загрузить файл с кодами')
+        # self.load_file.triggered.connect(self.load_file_triggered)
+
+        self.load_file_two = QAction(QIcon('icons\\cod-matrix-data.png'), 'Загрузить файл с кодами', self)
+        # self.load_file.setShortcut('Alt+Q')
+        self.load_file_two.setStatusTip('Загрузить файл с кодами')
+        self.load_file_two.setToolTip('Загрузить файл с кодами')
         # self.load_file.triggered.connect(self.load_file_triggered)
 
         self.setup = QAction(QIcon('icons\\setup.png'), 'Настройка', self)
