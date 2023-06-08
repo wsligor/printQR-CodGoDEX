@@ -295,7 +295,6 @@ class MainWindow(QMainWindow):
 
         # TODO Проверка принтера !!!
         printer = QtPrintSupport.QPrinter(mode=QtPrintSupport.QPrinter.PrinterMode.PrinterResolution)
-
         painter = QtGui.QPainter()
         page_size = QtGui.QPageSize(QtCore.QSize(120, 57))
         printer.setPageSize(page_size)
