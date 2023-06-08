@@ -250,6 +250,7 @@ class MainWindow(QMainWindow):
     def btnPrint_clicked(self):
         # TODO Полный рефакторинг функции
         printerName = self.cbSelectPrinter.currentText()
+
         if printerName != 'Godex G530':
             QMessageBox.critical(self, 'Attention', 'Установите принтер для печати этикеток')
             return
