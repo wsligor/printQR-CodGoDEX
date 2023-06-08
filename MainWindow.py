@@ -22,13 +22,20 @@ from ToolBar import ToolBar
 
 import prerare
 
-
-QR_IN = (
+# Масштаб преобразования pdf в jpg = 2.08
+QR_IN_2_008 = (
     (38, 88, 170, 220), (248, 88, 380, 220), (458, 88, 590, 220), (668, 88, 798, 220), (880, 88, 1012, 220),
     (38, 446, 170, 578), (248, 446, 380, 578), (458, 446, 590, 578), (668, 446, 798, 578), (880, 446, 1012, 578),
     (38, 804, 170, 936), (248, 804, 380, 936), (458, 804, 590, 936), (668, 804, 798, 936), (880, 804, 1012, 936),
     (38, 1162, 170, 1294), (248, 1162, 380, 1294), (458, 1162, 590, 1294), (668, 1162, 798, 1294),
     (880, 1162, 1012, 1294)
+)
+# Масштаб преобразования pdf в jpg = 1
+QR_IN_1 = (
+    (19,  43, 81, 105), (120,  43, 182, 105), (221,  43, 283, 105), (322,  43, 384, 105), (423,  43, 485, 105),
+    (19, 215, 81, 278), (120, 215, 182, 278), (221, 215, 283, 278), (322, 215, 384, 278), (423, 215, 485, 278),
+    (19, 387, 81, 449), (120, 387, 182, 449), (221, 387, 283, 449), (322, 387, 384, 449), (423, 387, 485, 449),
+    (19, 559, 81, 621), (120, 559, 182, 621), (221, 559, 283, 621), (322, 559, 384, 621), (423, 559, 485, 621)
 )
 
 def retry(func):
@@ -61,7 +68,7 @@ class threadCodJpgDecode(QThread):
             filename = workingDirectory + f
             img = ImagePIL.open(filename)
             for i in range(20):
-                crop_img = img.crop(QR_IN[i])
+                crop_img = img.crop(QR_IN_1[i])
                 data = decode(crop_img)
                 list_cod.append(data[0].data)
             self.signalExec.emit()
@@ -87,12 +94,8 @@ class threadCodJpgDecode(QThread):
         i = 0
         for page in pdf_in:
             i += 1
-            zoom_x = 2.08
-            zoom_y = 2.08
-            mat = fitz.Matrix(zoom_x, zoom_y)  # .preRotate(rotate)
-            # pix = page.getPixmap(matrix=mat, alpha=False)
             output_file = os.getcwd() + "\\tmp\\order" + str(i) + ".jpg"
-            pix = page.get_pixmap(matrix=mat)
+            pix = page.get_pixmap()
             pix.save(output_file)
         pdf_in.close()
 
@@ -185,12 +188,12 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(container)
 
     def load_file_two_triggered(self):
-        print('load_file_two.triggered')
+        # print('load_file_two.triggered')
         filename: str = QFileDialog.getOpenFileName(self, 'Открыть файл', os.getcwd(), 'PDF files (*.pdf)')[0]
         fn = os.path.basename(filename)
         if self.checkingFileUpload(fn):
             QMessageBox.critical(self, 'Внимание', 'Этот файл уже загружен в БД')
-            # return
+            return
         filelist = filename.split('_')
         gtin: str = filelist[3]
         if not gtin.isnumeric():
@@ -211,7 +214,6 @@ class MainWindow(QMainWindow):
         self.threadOne.signalStart.connect(self.threadStartOne)
         self.threadOne.signalExec.connect(self.threadExecOne)
         self.threadOne.finished.connect(self.threadFinishedOne)
-        # self.threadOne.signalFinished.connect(self.threadFinishedTwo)
         self.threadOne.start()
 
     @QtCore.Slot()
