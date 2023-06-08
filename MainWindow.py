@@ -287,8 +287,6 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, 'Внимание', 'Загрузите коды, не хватает для печати')
             return
 
-        return
-
         sql = f'''SELECT count(prefix) FROM party WHERE prefix = "{id_sku[1]}" GROUP BY prefix'''
         cur.execute(sql)
         record = cur.fetchone()
