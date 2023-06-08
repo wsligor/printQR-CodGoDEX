@@ -33,7 +33,7 @@ QR_IN_2_008 = (
 # Масштаб преобразования pdf в jpg = 1
 QR_IN_1 = (
     (19,  43, 81, 105), (120,  43, 182, 105), (221,  43, 283, 105), (322,  43, 384, 105), (423,  43, 485, 105),
-    (19, 215, 81, 278), (120, 215, 182, 278), (221, 215, 283, 278), (322, 215, 384, 278), (423, 215, 485, 278),
+    (19, 215, 81, 277), (120, 215, 182, 277), (221, 215, 283, 277), (322, 215, 384, 277), (423, 215, 485, 277),
     (19, 387, 81, 449), (120, 387, 182, 449), (221, 387, 283, 449), (322, 387, 384, 449), (423, 387, 485, 449),
     (19, 559, 81, 621), (120, 559, 182, 621), (221, 559, 283, 621), (322, 559, 384, 621), (423, 559, 485, 621)
 )
@@ -47,7 +47,7 @@ class threadCodJpgDecode(QThread):
     running = False
     signalStart = QtCore.Signal(int)
     signalExec = QtCore.Signal()
-    signalFinished = QtCore.Signal(list)
+    signalFinished = QtCore.Signal(int, int)
 
     # method which will execute algorithm in another thread
     def __init__(self, fileName, id_sku, fn):
@@ -63,6 +63,7 @@ class threadCodJpgDecode(QThread):
         self.convert_pdf2img(self.fileName)
         self.fileList = os.listdir(workingDirectory)
         self.signalStart.emit(len(self.fileList))
+        defectCodeCount: int = 0
         list_cod = []
         for f in self.fileList:
             filename = workingDirectory + f
@@ -70,7 +71,11 @@ class threadCodJpgDecode(QThread):
             for i in range(20):
                 crop_img = img.crop(QR_IN_1[i])
                 data = decode(crop_img)
-                list_cod.append(data[0].data)
+                if data:
+                    list_cod.append(data[0].data)
+                else:
+                    defectCodeCount += 1
+                    crop_img.save(f'crop_img{i+defectCodeCount}.jpg')
             self.signalExec.emit()
 
         dateToday = date.today()
@@ -87,6 +92,7 @@ class threadCodJpgDecode(QThread):
         cur.execute(sql)
         con.commit()
         con.close()
+        self.signalFinished.emit(len(list_cod_to_BD), defectCodeCount)
 
     def convert_pdf2img(self, filename: str):
         """Преобразует PDF в изображение и создает файл за страницей"""
@@ -216,6 +222,7 @@ class MainWindow(QMainWindow):
         self.threadOne = threadCodJpgDecode(filename, id_sku, fn)
         self.threadOne.signalStart.connect(self.threadStartOne)
         self.threadOne.signalExec.connect(self.threadExecOne)
+        self.threadOne.signalFinished.connect(self.threadFinishedTwo)
         self.threadOne.finished.connect(self.threadFinishedOne)
         self.threadOne.start()
 
@@ -235,11 +242,18 @@ class MainWindow(QMainWindow):
     def threadFinishedOne(self):
         self.progressBar.setValue(0)
         self.countProgress = 0
-        self.statusbar.showMessage('Завершено')
         self.modelSKU.modelRefreshSKU()
+
+    @QtCore.Slot()
+    def threadFinishedTwo(self, codeCount, defectCodeCount):
+        self.statusbar.showMessage(f'Загружено {codeCount}, забраковано {defectCodeCount}', 2500)
 
     def btnPrint_clicked(self):
         # TODO Полный рефакторинг функции
+        printerName = self.cbSelectPrinter.currentText()
+        if printerName != 'Godex G530':
+            QMessageBox.critical(self, 'Attention', 'Установите принтер для печати этикеток')
+            return
         dt = datetime.datetime.strptime(self.deDate.text(), "%d.%m.%Y")
         current_date = datetime.datetime.today() - datetime.timedelta(days=1)
         if dt < current_date:
