@@ -8,7 +8,16 @@ from pylibdmtx.pylibdmtx import decode
 CROP_RESIZE_WIDTH = 40
 CROP_RESIZE_HEIGHT = 40
 
+SIZE_DTMATRIX = 62
+
 TILED_SIZE = (4961, 6850)
+
+QR_IN1 = (
+    (19,  43, 81, 105), (120,  43, 182, 105), (221,  43, 283, 105), (322,  43, 384, 105), (423,  43, 485, 105),
+    (19, 215, 81, 278), (120, 215, 182, 278), (221, 215, 283, 278), (322, 215, 384, 278), (423, 215, 485, 278),
+    (19, 387, 81, 449), (120, 387, 182, 449), (221, 387, 283, 449), (322, 387, 384, 449), (423, 387, 485, 449),
+    (19, 559, 81, 621), (120, 559, 182, 621), (221, 559, 283, 621), (322, 559, 384, 621), (423, 559, 485, 621)
+)
 
 QR_IN = (
     (38, 88, 170, 220), (248, 88, 380, 220), (458, 88, 590, 220), (668, 88, 798, 220), (880, 88, 1012, 220),
@@ -25,7 +34,9 @@ def block(count_page, count):
         filename = os.getcwd() + '\\tmp\\order' + str(num_page) + '.jpg'
         img = ImagePIL.open(filename)
         for i in range(20):
-            crop_img = img.crop(QR_IN[i])
+            kr = QR_IN1[i]
+            crop_img = img.crop(kr)
+            crop_img.save(f'crop_img{i}.jpg')
             data = decode(crop_img)
             list_cod.append(data[0].data)
         num_page += 1
@@ -42,9 +53,9 @@ def convert_pdf2img(input_file: str, pages: Tuple = None):
     # Полистаем страницы
     for page in pdf_in:
         i += 1
-        if str(pages) != str(None):
-            if str(page) not in str(pages):
-                continue
+        # if str(pages) != str(None):
+        #     if str(page) not in str(pages):
+        #         continue
         # Выберем страницу
         # rotate = int(0)
         # PDF Страница конвертируется в целое изображение 1056 * 816, а затем для каждого изображения делается снимок экрана.
@@ -56,10 +67,11 @@ def convert_pdf2img(input_file: str, pages: Tuple = None):
         zoom_y = 2.08
         # Коэффициент масштабирования равен 2, чтобы текст был четким
         # Pre-rotate - это вращение при необходимости.
-        mat = fitz.Matrix(zoom_x, zoom_y)  # .preRotate(rotate)
+        # mat = fitz.Matrix(zoom_x, zoom_y)  # .preRotate(rotate)
         # pix = page.getPixmap(matrix=mat, alpha=False)
         output_file = os.getcwd() + "\\tmp\\order" + str(i) + ".jpg"
-        pix = page.get_pixmap(matrix=mat)
+        # pix = page.get_pixmap(matrix=mat)
+        pix = page.get_pixmap()
         # pix.writePNG(output_file)
         pix.save(output_file)
         output_files.append(output_file)

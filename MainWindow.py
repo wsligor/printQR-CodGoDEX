@@ -130,10 +130,14 @@ class MainWindow(QMainWindow):
         main_menu = MainMenu(self)
         # main_menu.load_file.triggered.connect(self.load_file_triggered)
         main_menu.load_file.triggered.connect(self.load_file_two_triggered)
+        main_menu.load_file.triggered.connect(self.load_file_triggered)
+        main_menu.load_file_two.triggered.connect(self.load_file_two_triggered)
         self.setMenuBar(main_menu)
         tool_bar = ToolBar(parent=self)
         # tool_bar.load_file.triggered.connect(self.load_file_triggered)
         tool_bar.load_file.triggered.connect(self.load_file_two_triggered)
+        tool_bar.load_file.triggered.connect(self.load_file_triggered)
+        tool_bar.load_file_two.triggered.connect(self.load_file_two_triggered)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, tool_bar)
         self.statusbar = QStatusBar()
         self.setStatusBar(self.statusbar)
@@ -222,6 +226,7 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, 'Внимание', 'gtin продукта не найден. Обратитесь к администратору')
             return
         id_sku = row[0]
+        self.setCursor(Qt.CursorShape.WaitCursor)
 
         self.threadOne = threadCodJpgDecode(filename, id_sku, fn)
         self.threadOne.signalStart.connect(self.threadStartOne)
@@ -246,6 +251,7 @@ class MainWindow(QMainWindow):
     def threadFinishedOne(self):
         self.progressBar.setValue(0)
         self.countProgress = 0
+        self.setCursor(Qt.CursorShape.ArrowCursor)
         self.modelSKU.modelRefreshSKU()
 
     @QtCore.Slot()
@@ -286,7 +292,6 @@ class MainWindow(QMainWindow):
         if self.sbCount.value() > record[0]:
             QMessageBox.information(self, 'Внимание', 'Загрузите коды, не хватает для печати')
             return
-
 
         sql = f'''SELECT count(prefix) FROM party WHERE prefix = "{id_sku[1]}" GROUP BY prefix'''
         cur.execute(sql)
