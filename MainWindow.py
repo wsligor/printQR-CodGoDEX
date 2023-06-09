@@ -222,6 +222,7 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, 'Внимание', 'gtin продукта не найден. Обратитесь к администратору')
             return
         id_sku = row[0]
+        self.setCursor(Qt.CursorShape.WaitCursor)
 
         self.threadOne = threadCodJpgDecode(filename, id_sku, fn)
         self.threadOne.signalStart.connect(self.threadStartOne)
@@ -246,6 +247,7 @@ class MainWindow(QMainWindow):
     def threadFinishedOne(self):
         self.progressBar.setValue(0)
         self.countProgress = 0
+        self.setCursor(Qt.CursorShape.ArrowCursor)
         self.modelSKU.modelRefreshSKU()
 
     @QtCore.Slot()
