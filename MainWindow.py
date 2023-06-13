@@ -121,7 +121,7 @@ class ModelSelectGroup(QSqlQueryModel):
 class MainWindow(QMainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle('Молочное море - PrintDM - GoDEX530 - v1.0.1')
+        self.setWindowTitle('Молочное море - PrintDM - GoDEX530 - v1.0.2')
         self.resize(800, 700)
         self.dlg = None
         self.countProgress = 0
@@ -261,7 +261,8 @@ class MainWindow(QMainWindow):
         # TODO Полный рефакторинг функции
         # TODO Проверить запрашиваемое количество кодов на печать
         printerName = self.cbSelectPrinter.currentText()
-        if printerName != 'Godex G530':
+        # if printerName != 'Godex G530':
+        if printerName != 'HPRT Prime (300 dpi)':
             QMessageBox.critical(self, 'Attention', 'Установите принтер для печати этикеток')
             return
         dt = datetime.datetime.strptime(self.deDate.text(), "%d.%m.%Y")
@@ -313,7 +314,14 @@ class MainWindow(QMainWindow):
 
         # TODO Проверка принтера !!!
         printer = QtPrintSupport.QPrinter(mode=QtPrintSupport.QPrinter.PrinterMode.PrinterResolution)
+        name = printer.printerName()
+        printerInfo = QtPrintSupport.QPrinterInfo().printerInfo(name)
+        print(printerInfo.defaultDuplexMode())
+        print(printerInfo.defaultPageSize())
+        print(printerInfo.printerName())
+        printer.setDuplex(QtPrintSupport.QPrinter.DuplexMode.DuplexNone)
         painter = QtGui.QPainter()
+        print(f'supportedResolutions = {printer.supportedResolutions()}')
         page_size = QtGui.QPageSize(QtCore.QSize(120, 57))
         printer.setPageSize(page_size)
         painter.begin(printer)
@@ -362,7 +370,8 @@ class MainWindow(QMainWindow):
             pixmap = QtGui.QPixmap('crop_img_cod.png')
             # pixmap = QtGui.QPixmap('enhancer_output.png')
             pixmap = pixmap.scaled(page_width, page_height, aspectMode=QtCore.Qt.AspectRatioMode.KeepAspectRatio)
-            painter.drawPixmap(20, 50, pixmap)
+            # painter.drawPixmap(20, 50, pixmap)
+            painter.drawPixmap(80, 50, pixmap)
             printer.newPage()
 
         painter.end()
