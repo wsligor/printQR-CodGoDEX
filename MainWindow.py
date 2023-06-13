@@ -216,7 +216,6 @@ class MainWindow(QMainWindow):
         if not gtin.isnumeric():
             QMessageBox.critical(self, 'Внимание', 'Нарушен формат имени файла. Обратитесь к администратору')
             return
-
         con = sl.connect('SFMDEX.db')
         cur = con.cursor()
         sql = f'SELECT id FROM sku WHERE gtin = "{gtin}"'
