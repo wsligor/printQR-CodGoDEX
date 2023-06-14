@@ -234,14 +234,16 @@ class MainWindow(QMainWindow):
 
 
     def readConfigINI(self):
-        print('readConfigINI')
         config = configparser.ConfigParser()
         config.read('setting.ini')
-
+        default = config['DEFAULT']
+        self.LabelType = default['LabelType']
+        self.PrinterControl = default['PrinterControl']
 
     def setupDialog_triggered(self):
         dlg = SetupWindow()
         dlg.exec()
+        self.readConfigINI()
 
     def load_file_two_triggered(self):
         # print('load_file_two.triggered')
@@ -303,8 +305,7 @@ class MainWindow(QMainWindow):
         # TODO Полный рефакторинг функции
         # TODO Проверить запрашиваемое количество кодов на печать
         printerName = self.cbSelectPrinter.currentText()
-        if printerName != 'HPRT Prime (300 dpi)':
-        # if printerName != 'Godex G530':
+        if printerName != self.PrinterControl:
             QMessageBox.critical(self, 'Attention', 'Установите принтер для печати этикеток')
             return
         dt = datetime.datetime.strptime(self.deDate.text(), "%d.%m.%Y")
@@ -315,17 +316,16 @@ class MainWindow(QMainWindow):
         if int(self.sbCount.text()) == 0:
             QMessageBox.critical(self, 'Внимание', 'Введите количество')
             return
-
-        n = self.tvSKU.currentIndex().row()
-        p = self.tvSKU.model().index(n, 0).data()
-        if n == -1:
+        selectIndexTableSKU = self.tvSKU.currentIndex().row()
+        selectGTIN = self.tvSKU.model().index(selectIndexTableSKU, 0).data()
+        if selectIndexTableSKU == -1:
             QMessageBox.information(self, 'Внимание', 'Выделите строку для печати')
             return
 
         con = sl.connect('SFMDEX.db')
         cur = con.cursor()
 
-        sql = f'SELECT id, prefix FROM sku WHERE gtin = "{p}"'
+        sql = f'SELECT id, prefix FROM sku WHERE gtin = "{selectGTIN}"'
         cur.execute(sql)
         id_sku = cur.fetchone()
         sql = f'SELECT count(cod) FROM codes WHERE id_sku = {id_sku[0]}'
@@ -338,77 +338,70 @@ class MainWindow(QMainWindow):
         sql = f'''SELECT count(prefix) FROM party WHERE prefix = "{id_sku[1]}" GROUP BY prefix'''
         cur.execute(sql)
         record = cur.fetchone()
-        num: int = 1
+        numParty: int = 1
         if not record:
             nameParty: str = id_sku[1] + '-' + '001'
             dateParty = self.deDate.text()
-            sql = f'''INSERT INTO party (name, date_doc, prefix, number) VALUES ("{nameParty}", "{dateParty}", "{id_sku[1]}", {num})'''
+            sql = f'''INSERT INTO party (name, date_doc, prefix, number) VALUES ("{nameParty}", "{dateParty}", "{id_sku[1]}", {numParty})'''
         else:
-            num: int = 1 + record[0]
-            numberParty = str(num)
+            numParty: int = 1 + record[0]
+            numberParty = str(numParty)
             prefixParty = id_sku[1]
             numberParty = numberParty.zfill(3)
             nameParty = prefixParty + '-' + numberParty
             dateParty = self.deDate.text()
-            sql = f'''INSERT INTO party (name, date_doc, prefix, number) VALUES ("{nameParty}", "{dateParty}", "{prefixParty}", {num})'''
+            sql = f'''INSERT INTO party (name, date_doc, prefix, number) VALUES ("{nameParty}", "{dateParty}", "{prefixParty}", {numParty})'''
         cur.execute(sql)
         con.commit()
 
         # TODO Проверка принтера !!!
         printer = QtPrintSupport.QPrinter(mode=QtPrintSupport.QPrinter.PrinterMode.PrinterResolution)
         painter = QtGui.QPainter()
-        page_size = QtGui.QPageSize(QtCore.QSize(120, 57))
+        page_size = QtGui.QPageSize(QtCore.QSize(92, 57))
         printer.setPageSize(page_size)
-        painter.begin(printer)
 
-        sql = f"SELECT cod, id FROM codes WHERE id_sku = {id_sku[0]} AND print = 0 ORDER BY date_load LIMIT {int(self.sbCount.text())}"
+        sql = f"SELECT cod, id FROM codes WHERE id_sku = {id_sku[0]} AND print = 0 ORDER BY date_load ASC LIMIT {self.sbCount.value()}"
         cur.execute(sql)
         codes_bd = cur.fetchall()
 
         i: int = 0
 
         for cod in codes_bd:
+            painter.begin(printer)
             encoded = encode(cod[0], scheme='', size='20x20')
-            sql = f'''UPDATE codes SET print = 1, id_party = {num} WHERE id = "{cod[1]}"'''
+            sql = f'''UPDATE codes SET print = 1, id_party = {numParty} WHERE id = "{cod[1]}"'''
             cur.execute(sql)
             con.commit()
 
             img_encod = Image.frombytes('RGB', (encoded.width, encoded.height), encoded.pixels)
-            # img_encoded = img_encod.resize((120, 120))
-            img_filter = img_encod.filter(ImageFilter.EDGE_ENHANCE)
-            img_filter.save('img_filter.png')
 
-            enhancer = ImageEnhance.Contrast(img_filter)
-            factor = 50
-            enhancer_output = enhancer.enhance(factor)
-            enhancer_output.save('enhancer_output.png')
+            if self.LabelType == 'DMCodDatePartyNumber':
+                img = Image.new('RGB', (354, 236), 'white')
+                img.paste(img_encod, (0, 0))
+                font = ImageFont.truetype('ARIALNBI.TTF', size=32)
+                dtext = ImageDraw.Draw(img)
+                dtext.text((130, 40), self.deDate.text(), font=font, fill=('#1C0606'))
+                dtext.text((130, 80), nameParty, font=font, fill=('#1C0606'))
+                i += 1
+                dtext.text((130, 0), str(i), font=font, fill=('#1C0606'))
 
-            img_encod.save('img_encoded.png')
+                img.save('crop_img_cod.png')
+                pixmap = QtGui.QPixmap('crop_img_cod.png')
+                painter.drawPixmap(50, 50, pixmap)
+            elif self.LabelType == 'OnlyDMCod':
+                img = Image.new('RGB', (300, 156), 'white')
+                img.paste(img_encod, (0, 0))
+                font = ImageFont.truetype('ARIALNBI.TTF', size=40)
+                dtext = ImageDraw.Draw(img)
+                i += 1
+                dtext.text((130, 0), str(i), font=font, fill=('#1C0606'))
 
-            img = Image.new('RGB', (454, 238), 'white')
-            img_cod = Image.open('enhancer_output.png')
-            img.paste(img_cod, (5, 5))
-            font = ImageFont.truetype('ARIALNBI.TTF', size=40)
-            dtext = ImageDraw.Draw(img)
-            dtext.text((130, 25), self.deDate.text(), font=font, fill=('#1C0606'))
-            # TODO получить номера партионного учета
-            # ввести соответствующий учет
-            dtext.text((130, 80), nameParty, font=font, fill=('#1C0606'))
-            i += 1
-            dtext.text((130, -10), str(i), font=font, fill=('#1C0606'))
+                img.save('crop_img_cod.png')
+                pixmap = QtGui.QPixmap('crop_img_cod.png')
+                painter.drawPixmap(100, 50, pixmap)
 
-            img.save('crop_img_cod.png')
+            painter.end()
 
-            page_size = printer.pageRect(QtPrintSupport.QPrinter.Unit.DevicePixel)
-            page_width = int(page_size.width())
-            page_height = int(page_size.height())
-            pixmap = QtGui.QPixmap('crop_img_cod.png')
-            # pixmap = QtGui.QPixmap('enhancer_output.png')
-            pixmap = pixmap.scaled(page_width, page_height, aspectMode=QtCore.Qt.AspectRatioMode.KeepAspectRatio)
-            painter.drawPixmap(20, 50, pixmap)
-            printer.newPage()
-
-        painter.end()
         con.close()
         self.modelSKU.modelRefreshSKU(1, id_groups=None)
 

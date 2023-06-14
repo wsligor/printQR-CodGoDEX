@@ -16,7 +16,7 @@ class SetupWindow(QDialog):
         lblCaptionLabelType = QLabel('Выберите вид этикетки:')
         self.rbOnlyDMCod = QRadioButton('Только DM код')
         self.rbOnlyDMCod.setToolTip('OnlyDMCod')
-        self.rbOnlyDMCod.setChecked(True)
+        # self.rbOnlyDMCod.setChecked(True)
         self.LabelType = self.rbOnlyDMCod.toolTip()
 
         self.rbDMCodDatePartyNumber = QRadioButton('DM код + дата + партия + №')
@@ -61,7 +61,23 @@ class SetupWindow(QDialog):
         layV.addLayout(layHButton)
 
         self.setLayout(layV)
+        self.readConfigINI()
 
+    def readConfigINI(self):
+        config = configparser.ConfigParser()
+        config.read('setting.ini')
+        default = config['DEFAULT']
+        LabelType = default['LabelType']
+        match LabelType:
+            case 'OnlyDMCod':
+                self.rbOnlyDMCod.setChecked(True)
+                self.rbDMCodDatePartyNumber.setChecked(False)
+            case 'DMCodDatePartyNumber':
+                self.rbDMCodDatePartyNumber.setChecked(True)
+                self.rbOnlyDMCod.setChecked(False)
+        PrinterControl = default['PrinterControl']
+        index = self.cbSetupPrinter.findText(PrinterControl)
+        self.cbSetupPrinter.setCurrentIndex(index)
 
     def btgLabelType_buttonClicked(self, btn):
         print(btn.toolTip())
