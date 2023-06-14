@@ -11,7 +11,7 @@ class ModelSKU(QSqlQueryModel):
         self.setHeaderData(1, Qt.Orientation.Horizontal, 'Наименование')
         self.setHeaderData(2, Qt.Orientation.Horizontal, 'Количество')
 
-    def modelRefreshSKU(self, id_groups=None):
+    def modelRefreshSKU(self, id_groups=None, id_company=None):
         match id_groups:
             case id_groups if id_groups == None:
                 sql = '''SELECT gtin, name, COUNT(id_sku) as codes 

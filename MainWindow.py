@@ -118,6 +118,16 @@ class ModelSelectGroup(QSqlQueryModel):
         sql = 'SELECT name, id FROM groups ORDER BY sort'
         self.setQuery(sql)
 
+class ModelSelectCompany(QSqlQueryModel):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.refresdSelectCompany()
+
+    def refresdSelectCompany(self):
+        sql = 'SELECT name, id FROM company ORDER BY id'
+        self.setQuery(sql)
+
+
 class MainWindow(QMainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -142,12 +152,18 @@ class MainWindow(QMainWindow):
         self.progressBar = QProgressBar()
         # self.progressBar.setMaximum(10)
         self.progressBar.setTextVisible(False)
-        lblSelectGroup = QLabel('Выберите группу:')
 
+        lblSelectGroup = QLabel('Выберите группу:')
         self.cbSelectGroup = QComboBox()
         self.modelSelectGrop = ModelSelectGroup()
         self.cbSelectGroup.setModel(self.modelSelectGrop)
         self.cbSelectGroup.currentTextChanged.connect(self.cbSelectGroup_currentTextChanged)
+
+        lblSelectCompany = QLabel('Выберите предприятие')
+        self.cbSelectCompany = QComboBox()
+        self.modelSelectCompany = ModelSelectCompany()
+        self.cbSelectCompany.setModel(self.modelSelectCompany)
+        self.cbSelectCompany.currentTextChanged.connect(self.cbSelectCompany_currentTextChanged)
 
         self.tvSKU = QTableView()
         self.modelSKU = ModelSKU()
@@ -187,6 +203,8 @@ class MainWindow(QMainWindow):
         layV.addWidget(self.progressBar)
         layV.addWidget(lblSelectGroup)
         layV.addWidget(self.cbSelectGroup)
+        layV.addWidget(lblSelectCompany)
+        layV.addWidget(self.cbSelectCompany)
         layV.addWidget(self.tvSKU)
         layV.addLayout(layHDateDate)
         layV.addLayout(layHLabelSelectPrinter)
@@ -422,15 +440,22 @@ class MainWindow(QMainWindow):
     def cbSelectGroup_currentTextChanged(self, name):
         print(name)
         sql = f'SELECT id FROM groups WHERE name = "{name}"'
-        print(sql)
         query = QtSql.QSqlQuery()
         query.exec(sql)
         if query.isActive():
             query.first()
-            i = query.value('id')
-            print(i)
-        self.modelSKU.modelRefreshSKU(i)
-        # self.refreshSKU()
+            id_group = query.value('id')
+        self.modelSKU.modelRefreshSKU(id_group=None)
+
+    def cbSelectCompany_currentTextChanged(self, name):
+        print(name)
+        sql = f'SELECT id FROM company WHERE name = "{name}"'
+        query = QtSql.QSqlQuery()
+        query.exec(sql)
+        if query.isActive():
+            query.first()
+            id_company = query.value('id')
+        self.modelSKU.modelRefreshSKU(id_company=None)
 
     def btnPrintClicked(self):
         pd = QtPrintSupport.QPrintDialog(self.printer, parent=self)
