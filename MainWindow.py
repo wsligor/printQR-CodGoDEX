@@ -1,28 +1,26 @@
-import os, shutil
+import os
 import datetime
 import fitz
 import configparser
 import sqlite3 as sl
 
 from datetime import date
-from PIL import Image, ImageFilter, ImageEnhance, ImageFont, ImageDraw
+from PIL import Image, ImageFont, ImageDraw
 from PIL import Image as ImagePIL
 from pylibdmtx.pylibdmtx import decode
 from pylibdmtx.pylibdmtx import encode
 
 from PySide6.QtSql import QSqlQueryModel
 from PySide6.QtWidgets import QMessageBox, QProgressBar
-from PySide6.QtWidgets import QMainWindow, QDialog, QTableView, QHeaderView, QHBoxLayout, QSpinBox, QPushButton
+from PySide6.QtWidgets import QMainWindow, QTableView, QHeaderView, QHBoxLayout, QSpinBox, QPushButton
 from PySide6.QtWidgets import QLabel, QStatusBar, QComboBox, QWidget, QVBoxLayout, QFileDialog, QDateEdit
-from PySide6.QtCore import Qt, QDateTime, QModelIndex, QThread
+from PySide6.QtCore import Qt, QThread
 from PySide6 import QtPrintSupport, QtGui, QtCore, QtSql
 
 from MainMenu import MainMenu
 from ModelSKU import ModelSKU
 from ToolBar import ToolBar
 from SetupWindow import SetupWindow
-
-import prerare
 
 # Масштаб преобразования pdf в jpg = 2.08
 QR_IN_2_008 = (
@@ -40,10 +38,6 @@ QR_IN_1 = (
     (19, 559, 81, 621), (120, 559, 182, 621), (221, 559, 283, 621), (322, 559, 384, 621), (423, 559, 485, 621)
 )
 
-# def retry(func):
-#     def _wraper(*args, **kwargs):
-#         func(*args, **kwargs)
-#     return _wraper()
 
 class threadCodJpgDecode(QThread):
     running = False
@@ -279,9 +273,9 @@ class MainWindow(QMainWindow):
         self.threadOne.start()
 
     @QtCore.Slot()
-    def threadStartOne(self, l):
+    def threadStartOne(self, maxValueProgressBar):
         self.statusbar.showMessage('Загрузка кодов в БД ...')
-        self.progressBar.setMaximum(l)
+        self.progressBar.setMaximum(maxValueProgressBar)
 
     @QtCore.Slot()
     def threadExecOne(self):
@@ -339,7 +333,8 @@ class MainWindow(QMainWindow):
         if not record:
             nameParty: str = id_sku[1] + '-' + '001'
             dateParty = self.deDate.text()
-            sql = f'''INSERT INTO party (name, date_doc, prefix, number) VALUES ("{nameParty}", "{dateParty}", "{id_sku[1]}", {numParty})'''
+            sql = f'''INSERT INTO party (name, date_doc, prefix, number) 
+                        VALUES ("{nameParty}", "{dateParty}", "{id_sku[1]}", {numParty})'''
         else:
             numParty: int = 1 + record[0]
             numberParty = str(numParty)
@@ -347,7 +342,8 @@ class MainWindow(QMainWindow):
             numberParty = numberParty.zfill(3)
             nameParty = prefixParty + '-' + numberParty
             dateParty = self.deDate.text()
-            sql = f'''INSERT INTO party (name, date_doc, prefix, number) VALUES ("{nameParty}", "{dateParty}", "{prefixParty}", {numParty})'''
+            sql = f'''INSERT INTO party (name, date_doc, prefix, number) 
+                        VALUES ("{nameParty}", "{dateParty}", "{prefixParty}", {numParty})'''
         cur.execute(sql)
         con.commit()
 
@@ -356,7 +352,8 @@ class MainWindow(QMainWindow):
         page_size = QtGui.QPageSize(QtCore.QSize(92, 57))
         printer.setPageSize(page_size)
 
-        sql = f"SELECT cod, id FROM codes WHERE id_sku = {id_sku[0]} AND print = 0 ORDER BY date_load ASC LIMIT {self.sbCount.value()}"
+        sql = f'''SELECT cod, id FROM codes 
+                    WHERE id_sku = {id_sku[0]} AND print = 0 ORDER BY date_load ASC LIMIT {self.sbCount.value()}'''
         cur.execute(sql)
         codes_bd = cur.fetchall()
 
@@ -453,25 +450,23 @@ class MainWindow(QMainWindow):
         hv.hide()
 
     def cbSelectGroup_currentTextChanged(self, name): # Выбор группы
-        print(name)
         sql = f'SELECT id FROM groups WHERE name = "{name}"'
         query = QtSql.QSqlQuery()
         query.exec(sql)
         if query.isActive():
             query.first()
             id_groups = query.value('id')
-        self.id_groups = id_groups
+            self.id_groups = id_groups
         self.modelSKU.modelRefreshSKU(self.id_company, id_groups)
 
     def cbSelectCompany_currentTextChanged(self, name): # Выбор кампании
-        print(name)
         sql = f'SELECT id FROM company WHERE name = "{name}"'
         query = QtSql.QSqlQuery()
         query.exec(sql)
         if query.isActive():
             query.first()
             id_company = query.value('id')
-        self.id_company = id_company
+            self.id_company = id_company
         self.cbSelectGroup.setCurrentIndex(0)
         self.modelSKU.modelRefreshSKU(id_company, id_groups=None)
 
