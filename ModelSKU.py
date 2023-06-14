@@ -6,7 +6,7 @@ class ModelSKU(QSqlQueryModel):
     def __init__(self, parent=None):
         super().__init__(parent)
 
-        self.modelRefreshSKU(1, id_groups=None)
+        self.modelRefreshSKU(1, id_groups=None) # инициализация установка на первую организацию id = 1
         self.setHeaderData(0, Qt.Orientation.Horizontal, 'GTIN')
         self.setHeaderData(1, Qt.Orientation.Horizontal, 'Наименование')
         self.setHeaderData(2, Qt.Orientation.Horizontal, 'Количество')

@@ -5,6 +5,8 @@ from PySide6.QtWidgets import QVBoxLayout, QPushButton, QHBoxLayout, QRadioButto
 
 import configparser
 
+# TODO Переопределить класс RadioButton добавить свойство для хранения текстового значения
+
 class SetupWindow(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -16,7 +18,6 @@ class SetupWindow(QDialog):
         lblCaptionLabelType = QLabel('Выберите вид этикетки:')
         self.rbOnlyDMCod = QRadioButton('Только DM код')
         self.rbOnlyDMCod.setToolTip('OnlyDMCod')
-        # self.rbOnlyDMCod.setChecked(True)
         self.LabelType = self.rbOnlyDMCod.toolTip()
 
         self.rbDMCodDatePartyNumber = QRadioButton('DM код + дата + партия + №')

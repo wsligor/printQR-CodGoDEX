@@ -211,7 +211,7 @@ class MainWindow(QMainWindow):
         lblSelectPrinter = QLabel('Выберите принтер: ')
         self.cbSelectPrinter = QComboBox()
         self.cbSelectPrinter.addItems(QtPrintSupport.QPrinterInfo.availablePrinterNames())
-        self.cbSelectPrinter.currentTextChanged[str].connect(self.showData)
+        # self.cbSelectPrinter.currentTextChanged[str].connect(self.showData)
         layHLabelSelectPrinter = QHBoxLayout()
         layHLabelSelectPrinter.addWidget(lblSelectPrinter)
         layHLabelSelectPrinter.addWidget(self.cbSelectPrinter)
@@ -283,7 +283,6 @@ class MainWindow(QMainWindow):
         self.statusbar.showMessage('Загрузка кодов в БД ...')
         self.progressBar.setMaximum(l)
 
-
     @QtCore.Slot()
     def threadExecOne(self):
         self.countProgress += 1
@@ -295,7 +294,7 @@ class MainWindow(QMainWindow):
         self.progressBar.setValue(0)
         self.countProgress = 0
         self.setCursor(Qt.CursorShape.ArrowCursor)
-        self.modelSKU.modelRefreshSKU(1, id_groups=None)
+        self.modelSKU.modelRefreshSKU(self.id_company, id_groups=None)
 
     @QtCore.Slot()
     def threadFinishedTwo(self, codeCount, defectCodeCount):
@@ -403,7 +402,7 @@ class MainWindow(QMainWindow):
             painter.end()
 
         con.close()
-        self.modelSKU.modelRefreshSKU(1, id_groups=None)
+        self.modelSKU.modelRefreshSKU(self.id_company, self.id_groups)
 
     def checkingFileUpload(self, filename):
         sql = f'''SELECT COUNT(name) FROM file_load WHERE name = "{filename}"'''
@@ -416,38 +415,38 @@ class MainWindow(QMainWindow):
         else:
             return True
 
-    def load_file_triggered(self):
-        # TODO проверить gtin в базе если нет выдать предупреждение
-        con = sl.connect('SFMDEX.db')
-        cur = con.cursor()
-        filename: str = QFileDialog.getOpenFileName(self, 'Открыть файл', os.getcwd(), 'PDF files (*.pdf)')[0]
-        fn = os.path.basename(filename)
-        if self.checkingFileUpload(fn):
-            QMessageBox.critical(self, 'Внимание', 'Этот файл уже загружен в БД')
-            # return
-        filelist = filename.split('_')
-        list_cod = prerare.convertPdfToJpg(filename)
-        gtin: str = filelist[3]
-        if not gtin.isnumeric():
-            QMessageBox.critical(self, 'Внимание', 'gtin продукта не найден. Обратитесь к администратору')
-            return
-        sql = f'SELECT id FROM sku WHERE gtin = "{gtin}"'
-        cur.execute(sql)
-        row = cur.fetchone()
-        id_sku = row[0]
-        dateToday = date.today()
-        list_cod_to_BD = []
-        for cod in list_cod:
-            str_list_cod = (id_sku, cod, 0, 0, dateToday)
-            list_cod_to_BD.append(str_list_cod)
-        sql = '''INSERT INTO codes(id_sku, cod, print, id_party, date_load) values(?,?,?,?,?)'''
-        cur.executemany(sql, list_cod_to_BD)
-        sql = f'''INSERT INTO file_load (name) values("{fn}")'''
-        cur.execute(sql)
-        con.commit()
-        con.close()
-        self.modelSKU.modelRefreshSKU(1, id_groups=None) #Загрузка файлов в БД
-        QMessageBox.information(self, 'Все', 'Все')
+    # def load_file_triggered(self):
+    #     # TODO проверить gtin в базе если нет выдать предупреждение
+    #     con = sl.connect('SFMDEX.db')
+    #     cur = con.cursor()
+    #     filename: str = QFileDialog.getOpenFileName(self, 'Открыть файл', os.getcwd(), 'PDF files (*.pdf)')[0]
+    #     fn = os.path.basename(filename)
+    #     if self.checkingFileUpload(fn):
+    #         QMessageBox.critical(self, 'Внимание', 'Этот файл уже загружен в БД')
+    #         # return
+    #     filelist = filename.split('_')
+    #     list_cod = prerare.convertPdfToJpg(filename)
+    #     gtin: str = filelist[3]
+    #     if not gtin.isnumeric():
+    #         QMessageBox.critical(self, 'Внимание', 'gtin продукта не найден. Обратитесь к администратору')
+    #         return
+    #     sql = f'SELECT id FROM sku WHERE gtin = "{gtin}"'
+    #     cur.execute(sql)
+    #     row = cur.fetchone()
+    #     id_sku = row[0]
+    #     dateToday = date.today()
+    #     list_cod_to_BD = []
+    #     for cod in list_cod:
+    #         str_list_cod = (id_sku, cod, 0, 0, dateToday)
+    #         list_cod_to_BD.append(str_list_cod)
+    #     sql = '''INSERT INTO codes(id_sku, cod, print, id_party, date_load) values(?,?,?,?,?)'''
+    #     cur.executemany(sql, list_cod_to_BD)
+    #     sql = f'''INSERT INTO file_load (name) values("{fn}")'''
+    #     cur.execute(sql)
+    #     con.commit()
+    #     con.close()
+    #     self.modelSKU.modelRefreshSKU(1, id_groups=None) #Загрузка файлов в БД
+    #     QMessageBox.information(self, 'Все', 'Все')
 
 
     def refreshSKU(self):
@@ -456,7 +455,6 @@ class MainWindow(QMainWindow):
         hh.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         hv = self.tvSKU.verticalHeader()
         hv.hide()
-
 
     def cbSelectGroup_currentTextChanged(self, name): # Выбор группы
         print(name)
@@ -481,119 +479,119 @@ class MainWindow(QMainWindow):
         self.cbSelectGroup.setCurrentIndex(0)
         self.modelSKU.modelRefreshSKU(id_company, id_groups=None)
 
-    def btnPrintClicked(self):
-        pd = QtPrintSupport.QPrintDialog(self.printer, parent=self)
+    # def btnPrintClicked(self):
+    #     pd = QtPrintSupport.QPrintDialog(self.printer, parent=self)
+    #
+    #     pd.setOptions(QtPrintSupport.QAbstractPrintDialog.PrintDialogOption.PrintToFile |
+    #                   QtPrintSupport.QAbstractPrintDialog.PrintDialogOption.PrintSelection)
+    #     if pd.exec() == QDialog.DialogCode.Accepted:
+    #         self._PrintImage(self.printer)
+    #     pass
 
-        pd.setOptions(QtPrintSupport.QAbstractPrintDialog.PrintDialogOption.PrintToFile |
-                      QtPrintSupport.QAbstractPrintDialog.PrintDialogOption.PrintSelection)
-        if pd.exec() == QDialog.DialogCode.Accepted:
-            self._PrintImage(self.printer)
-        pass
+    # def _PaintImage(self, printer):
+    #     painter = QtGui.QPainter()
+    #     painter.begin(printer)
+    #     pixmap = QtGui.QPixmap('img_encoded.jpg')
+    #     pixmap = pixmap.scaled(printer.width(), printer.height(), aspectMode=Qt.AspectRatioMode.KeepAspectRatio)
+    #     print(f'Paint width {printer.width()}, height {printer.height()}, PageRect {printer.pageRect}')
+    #     painter.drawPixmap(0, 0, pixmap)
+    #     painter.end()
+    #     # self.ppwMain.exec()
+    #     pass
 
-    def _PaintImage(self, printer):
-        painter = QtGui.QPainter()
-        painter.begin(printer)
-        pixmap = QtGui.QPixmap('img_encoded.jpg')
-        pixmap = pixmap.scaled(printer.width(), printer.height(), aspectMode=Qt.AspectRatioMode.KeepAspectRatio)
-        print(f'Paint width {printer.width()}, height {printer.height()}, PageRect {printer.pageRect}')
-        painter.drawPixmap(0, 0, pixmap)
-        painter.end()
-        # self.ppwMain.exec()
-        pass
-
-    def _PrintImage(self, printer):
-        painter = QtGui.QPainter()
-        self.printer.setPageSize(QtCore.QSize(95, 57))
-        painter.begin(printer)
-        page_size = printer.pageRect(QtPrintSupport.QPrinter.Unit.DevicePixel)
-        print(page_size.height(), page_size.width())
-        pixmap = QtGui.QPixmap('img_encoded.jpg')
-        # pixmap = pixmap.scaled(printer.width(), printer.height(), aspectMode=Qt.AspectRatioMode.KeepAspectRatio)
-        pixmap = pixmap.scaled(page_size.height(), page_size.width(), aspectMode=Qt.AspectRatioMode.KeepAspectRatio)
-        print(f'Print width {printer.width()}, height {printer.height()}')
-        painter.drawPixmap(0, 0, pixmap)
-
-        print(f'width {printer.width()}, height {printer.height()}')
-        painter.end()
+    # def _PrintImage(self, printer):
+    #     painter = QtGui.QPainter()
+    #     self.printer.setPageSize(QtCore.QSize(95, 57))
+    #     painter.begin(printer)
+    #     page_size = printer.pageRect(QtPrintSupport.QPrinter.Unit.DevicePixel)
+    #     print(page_size.height(), page_size.width())
+    #     pixmap = QtGui.QPixmap('img_encoded.jpg')
+    #     # pixmap = pixmap.scaled(printer.width(), printer.height(), aspectMode=Qt.AspectRatioMode.KeepAspectRatio)
+    #     pixmap = pixmap.scaled(page_size.height(), page_size.width(), aspectMode=Qt.AspectRatioMode.KeepAspectRatio)
+    #     print(f'Print width {printer.width()}, height {printer.height()}')
+    #     painter.drawPixmap(0, 0, pixmap)
+    #
+    #     print(f'width {printer.width()}, height {printer.height()}')
+    #     painter.end()
 
 
-    def showData(self, name):
-        printer = QtPrintSupport.QPrinterInfo.printerInfo(name)
-        s = "Название: " + name + "\n\n"
-        if printer.isDefault():
-            s += "Принтер по умолчанию\n"
-        s2 = printer.makeAndModel()
-        if s != s2:
-            s += "Полное название: " + s2 + "\n"
-        s2 = printer.description()
-        if s != s2:
-            s += "Описание: " + s2 + "\n"
-        if printer.isRemote():
-            s += "Сетевой принтер\n"
-        s2 = printer.location()
-        if s2:
-            s += "Расположение: " + s2 + "\n"
-        s += "\n"
-        match printer.state():
-            case QtPrintSupport.QPrinter.PrinterState.Idle:
-                s2 = "простаивает"
-            case QtPrintSupport.QPrinter.PrinterState.Active:
-                s2 = "идёт печать"
-            case QtPrintSupport.QPrinter.PrinterState.Aborted:
-                s2 = "печать прервана"
-            case QtPrintSupport.QPrinter.PrinterState.Error:
-                s2 = "возникла ошибка"
-        s += "Состояние: " + s2 + "\n\n"
-        s += "Размер бумаги по умолчанию: " + \
-             printer.defaultPageSize().name() + "\n"
-        s2 = ", ".join([s.name() for s in printer.supportedPageSizes()])
-        if printer.supportsCustomPageSizes():
-            s2 += ", произвольные размеры"
-        s += "Поддерживаемые размеры бумаги: " + s2 + "\n"
-        s += "Минимальный размер бумаги: " + \
-             printer.minimumPhysicalPageSize().name() + "\n"
-        s += "Максимальный размер бумаги: " + \
-             printer.maximumPhysicalPageSize().name() + "\n\n"
-        s += "Режим двусторонней печати по умолчанию: " + \
-             self._getDuplexModeName(printer.defaultDuplexMode()) + "\n"
-        s2 = ""
-        for m in printer.supportedDuplexModes():
-            if s2:
-                s2 += ", "
-            s2 += self._getDuplexModeName(m)
-        s += "Поддерживаемые режимы двухсторонней печати: " + s2 + "\n\n"
-        s += "Режим цветной печати по умолчанию: " + \
-             self._getColorModeName(printer.defaultColorMode()) + "\n"
-        s2 = ""
-        for m in printer.supportedColorModes():
-            if s2:
-                s2 += ", "
-            s2 += self._getColorModeName(m)
-        s += "Поддерживаемые режимы цветной печати: " + s2 + "\n\n"
-        s2 = ", ".join([str(r) for r in printer.supportedResolutions()])
-        s += "Поддерживаемые разрешения, точек/дюйм: " + s2
-        self.cbSelectPrinter.setCurrentText(s)
-        # self.tePrintInfo.setText(s)
-
-    @staticmethod
-    def _getDuplexModeName(ident):
-        match ident:
-            case QtPrintSupport.QPrinter.DuplexMode.DuplexNone:
-                return "односторонняя печать"
-            case QtPrintSupport.QPrinter.DuplexMode.DuplexAuto:
-                return "двухсторонняя печать с автоматическим выбором " + \
-                    "стороны листа"
-            case QtPrintSupport.QPrinter.DuplexMode.DuplexLongSide:
-                return "двухсторонняя печать с переворотом листа вокруг " + \
-                    "длинной стороны"
-            case QtPrintSupport.QPrinter.DuplexMode.DuplexShortSide:
-                return "двухсторонняя печать с переворотом листа вокруг " + \
-                    "короткой стороны"
-
-    @staticmethod
-    def _getColorModeName(ident):
-        match ident:
-            case QtPrintSupport.QPrinter.ColorMode.Color:
-                return "цветная печать"
-            case QtPrintSupport.QPrinter.ColorMode.GrayScale:
-                return "печать оттенками серого"
+    # def showData(self, name):
+    #     printer = QtPrintSupport.QPrinterInfo.printerInfo(name)
+    #     s = "Название: " + name + "\n\n"
+    #     if printer.isDefault():
+    #         s += "Принтер по умолчанию\n"
+    #     s2 = printer.makeAndModel()
+    #     if s != s2:
+    #         s += "Полное название: " + s2 + "\n"
+    #     s2 = printer.description()
+    #     if s != s2:
+    #         s += "Описание: " + s2 + "\n"
+    #     if printer.isRemote():
+    #         s += "Сетевой принтер\n"
+    #     s2 = printer.location()
+    #     if s2:
+    #         s += "Расположение: " + s2 + "\n"
+    #     s += "\n"
+    #     match printer.state():
+    #         case QtPrintSupport.QPrinter.PrinterState.Idle:
+    #             s2 = "простаивает"
+    #         case QtPrintSupport.QPrinter.PrinterState.Active:
+    #             s2 = "идёт печать"
+    #         case QtPrintSupport.QPrinter.PrinterState.Aborted:
+    #             s2 = "печать прервана"
+    #         case QtPrintSupport.QPrinter.PrinterState.Error:
+    #             s2 = "возникла ошибка"
+    #     s += "Состояние: " + s2 + "\n\n"
+    #     s += "Размер бумаги по умолчанию: " + \
+    #          printer.defaultPageSize().name() + "\n"
+    #     s2 = ", ".join([s.name() for s in printer.supportedPageSizes()])
+    #     if printer.supportsCustomPageSizes():
+    #         s2 += ", произвольные размеры"
+    #     s += "Поддерживаемые размеры бумаги: " + s2 + "\n"
+    #     s += "Минимальный размер бумаги: " + \
+    #          printer.minimumPhysicalPageSize().name() + "\n"
+    #     s += "Максимальный размер бумаги: " + \
+    #          printer.maximumPhysicalPageSize().name() + "\n\n"
+    #     s += "Режим двусторонней печати по умолчанию: " + \
+    #          self._getDuplexModeName(printer.defaultDuplexMode()) + "\n"
+    #     s2 = ""
+    #     for m in printer.supportedDuplexModes():
+    #         if s2:
+    #             s2 += ", "
+    #         s2 += self._getDuplexModeName(m)
+    #     s += "Поддерживаемые режимы двухсторонней печати: " + s2 + "\n\n"
+    #     s += "Режим цветной печати по умолчанию: " + \
+    #          self._getColorModeName(printer.defaultColorMode()) + "\n"
+    #     s2 = ""
+    #     for m in printer.supportedColorModes():
+    #         if s2:
+    #             s2 += ", "
+    #         s2 += self._getColorModeName(m)
+    #     s += "Поддерживаемые режимы цветной печати: " + s2 + "\n\n"
+    #     s2 = ", ".join([str(r) for r in printer.supportedResolutions()])
+    #     s += "Поддерживаемые разрешения, точек/дюйм: " + s2
+    #     self.cbSelectPrinter.setCurrentText(s)
+    #     # self.tePrintInfo.setText(s)
+    #
+    # @staticmethod
+    # def _getDuplexModeName(ident):
+    #     match ident:
+    #         case QtPrintSupport.QPrinter.DuplexMode.DuplexNone:
+    #             return "односторонняя печать"
+    #         case QtPrintSupport.QPrinter.DuplexMode.DuplexAuto:
+    #             return "двухсторонняя печать с автоматическим выбором " + \
+    #                 "стороны листа"
+    #         case QtPrintSupport.QPrinter.DuplexMode.DuplexLongSide:
+    #             return "двухсторонняя печать с переворотом листа вокруг " + \
+    #                 "длинной стороны"
+    #         case QtPrintSupport.QPrinter.DuplexMode.DuplexShortSide:
+    #             return "двухсторонняя печать с переворотом листа вокруг " + \
+    #                 "короткой стороны"
+    #
+    # @staticmethod
+    # def _getColorModeName(ident):
+    #     match ident:
+    #         case QtPrintSupport.QPrinter.ColorMode.Color:
+    #             return "цветная печать"
+    #         case QtPrintSupport.QPrinter.ColorMode.GrayScale:
+    #             return "печать оттенками серого"
