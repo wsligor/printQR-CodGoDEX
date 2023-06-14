@@ -1,11 +1,12 @@
 import os, shutil
 import datetime
-from datetime import date
+import fitz
+import configparser
 import sqlite3 as sl
+
+from datetime import date
 from PIL import Image, ImageFilter, ImageEnhance, ImageFont, ImageDraw
 from PIL import Image as ImagePIL
-import fitz
-
 from pylibdmtx.pylibdmtx import decode
 from pylibdmtx.pylibdmtx import encode
 
@@ -19,6 +20,7 @@ from PySide6 import QtPrintSupport, QtGui, QtCore, QtSql
 from MainMenu import MainMenu
 from ModelSKU import ModelSKU
 from ToolBar import ToolBar
+from SetupWindow import SetupWindow
 
 import prerare
 
@@ -138,14 +140,18 @@ class MainWindow(QMainWindow):
         self.codes = []
         self.id_company = None
         self.id_groups = None
+        self.LabelType = ''
+        self.PrinterControl = ''
 
         main_menu = MainMenu(self)
-        main_menu.load_file.triggered.connect(self.load_file_triggered)
+        # main_menu.load_file.triggered.connect(self.load_file_triggered)
         main_menu.load_file_two.triggered.connect(self.load_file_two_triggered)
+        main_menu.setup.triggered.connect(self.setupDialog_triggered)
         self.setMenuBar(main_menu)
         tool_bar = ToolBar(parent=self)
-        tool_bar.load_file.triggered.connect(self.load_file_triggered)
+        # tool_bar.load_file.triggered.connect(self.load_file_triggered)
         tool_bar.load_file_two.triggered.connect(self.load_file_two_triggered)
+        tool_bar.setup.triggered.connect(self.setupDialog_triggered)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, tool_bar)
         self.statusbar = QStatusBar()
         self.setStatusBar(self.statusbar)
@@ -159,12 +165,22 @@ class MainWindow(QMainWindow):
         self.modelSelectGrop = ModelSelectGroup()
         self.cbSelectGroup.setModel(self.modelSelectGrop)
         self.cbSelectGroup.currentTextChanged.connect(self.cbSelectGroup_currentTextChanged)
+        layVselectGroup = QVBoxLayout()
+        layVselectGroup.addWidget(lblSelectGroup)
+        layVselectGroup.addWidget(self.cbSelectGroup)
 
         lblSelectCompany = QLabel('Выберите предприятие')
         self.cbSelectCompany = QComboBox()
         self.modelSelectCompany = ModelSelectCompany()
         self.cbSelectCompany.setModel(self.modelSelectCompany)
         self.cbSelectCompany.currentTextChanged.connect(self.cbSelectCompany_currentTextChanged)
+        layVselectCompany = QVBoxLayout()
+        layVselectCompany.addWidget(lblSelectCompany)
+        layVselectCompany.addWidget(self.cbSelectCompany)
+
+        layHGroupCompany = QHBoxLayout()
+        layHGroupCompany.addLayout(layVselectGroup)
+        layHGroupCompany.addLayout(layVselectCompany)
 
         self.tvSKU = QTableView()
         self.modelSKU = ModelSKU()
@@ -202,10 +218,7 @@ class MainWindow(QMainWindow):
         layHLabelSelectPrinter.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
         layV.addWidget(self.progressBar)
-        layV.addWidget(lblSelectGroup)
-        layV.addWidget(self.cbSelectGroup)
-        layV.addWidget(lblSelectCompany)
-        layV.addWidget(self.cbSelectCompany)
+        layV.addLayout(layHGroupCompany)
         layV.addWidget(self.tvSKU)
         layV.addLayout(layHDateDate)
         layV.addLayout(layHLabelSelectPrinter)
@@ -216,6 +229,19 @@ class MainWindow(QMainWindow):
         container.setLayout(layV)
         self.centralWidget()
         self.setCentralWidget(container)
+
+        self.readConfigINI()
+
+
+    def readConfigINI(self):
+        print('readConfigINI')
+        config = configparser.ConfigParser()
+        config.read('setting.ini')
+
+
+    def setupDialog_triggered(self):
+        dlg = SetupWindow()
+        dlg.exec()
 
     def load_file_two_triggered(self):
         # print('load_file_two.triggered')
@@ -277,7 +303,8 @@ class MainWindow(QMainWindow):
         # TODO Полный рефакторинг функции
         # TODO Проверить запрашиваемое количество кодов на печать
         printerName = self.cbSelectPrinter.currentText()
-        if printerName != 'Godex G530':
+        if printerName != 'HPRT Prime (300 dpi)':
+        # if printerName != 'Godex G530':
             QMessageBox.critical(self, 'Attention', 'Установите принтер для печати этикеток')
             return
         dt = datetime.datetime.strptime(self.deDate.text(), "%d.%m.%Y")
@@ -458,7 +485,8 @@ class MainWindow(QMainWindow):
             query.first()
             id_company = query.value('id')
         self.id_company = id_company
-        self.modelSKU.modelRefreshSKU(id_company, self.id_groups)
+        self.cbSelectGroup.setCurrentIndex(0)
+        self.modelSKU.modelRefreshSKU(id_company, id_groups=None)
 
     def btnPrintClicked(self):
         pd = QtPrintSupport.QPrintDialog(self.printer, parent=self)
