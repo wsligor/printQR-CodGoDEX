@@ -3,7 +3,6 @@ from Application import Application
 from MainWindow import MainWindow
 
 # TODO Меню по правой клавише на таблице копировать gtin, наименование, префикс
-# TODO Изменить курсор мыши при прогресс баре
 # TODO Контроль уникальности кодов
 
 

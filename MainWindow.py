@@ -301,8 +301,6 @@ class MainWindow(QMainWindow):
         self.statusbar.showMessage(f'Загружено {codeCount}, забраковано {defectCodeCount}', 2500)
 
     def btnPrint_clicked(self):
-        # TODO Полный рефакторинг функции
-        # TODO Проверить запрашиваемое количество кодов на печать
         printerName = self.cbSelectPrinter.currentText()
         if printerName != self.PrinterControl:
             QMessageBox.critical(self, 'Attention', 'Установите принтер для печати этикеток')
@@ -353,7 +351,6 @@ class MainWindow(QMainWindow):
         cur.execute(sql)
         con.commit()
 
-        # TODO Проверка принтера !!!
         printer = QtPrintSupport.QPrinter(mode=QtPrintSupport.QPrinter.PrinterMode.PrinterResolution)
         painter = QtGui.QPainter()
         page_size = QtGui.QPageSize(QtCore.QSize(92, 57))
@@ -416,7 +413,6 @@ class MainWindow(QMainWindow):
             return True
 
     # def load_file_triggered(self):
-    #     # TODO проверить gtin в базе если нет выдать предупреждение
     #     con = sl.connect('SFMDEX.db')
     #     cur = con.cursor()
     #     filename: str = QFileDialog.getOpenFileName(self, 'Открыть файл', os.getcwd(), 'PDF files (*.pdf)')[0]
