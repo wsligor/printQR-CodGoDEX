@@ -131,11 +131,13 @@ class ModelSelectCompany(QSqlQueryModel):
 class MainWindow(QMainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle('Молочное море - PrintDM - GoDEX530 - v1.0.1')
+        self.setWindowTitle('Молочное море/Биорич - PrintDM - GoDEX530 - v1.0.3')
         self.resize(800, 700)
         self.dlg = None
         self.countProgress = 0
         self.codes = []
+        self.id_company = None
+        self.id_groups = None
 
         main_menu = MainMenu(self)
         main_menu.load_file.triggered.connect(self.load_file_triggered)
@@ -150,7 +152,6 @@ class MainWindow(QMainWindow):
 
         layV = QVBoxLayout()
         self.progressBar = QProgressBar()
-        # self.progressBar.setMaximum(10)
         self.progressBar.setTextVisible(False)
 
         lblSelectGroup = QLabel('Выберите группу:')
@@ -266,7 +267,7 @@ class MainWindow(QMainWindow):
         self.progressBar.setValue(0)
         self.countProgress = 0
         self.setCursor(Qt.CursorShape.ArrowCursor)
-        self.modelSKU.modelRefreshSKU()
+        self.modelSKU.modelRefreshSKU(1, id_groups=None)
 
     @QtCore.Slot()
     def threadFinishedTwo(self, codeCount, defectCodeCount):
@@ -382,7 +383,7 @@ class MainWindow(QMainWindow):
 
         painter.end()
         con.close()
-        self.modelSKU.modelRefreshSKU()
+        self.modelSKU.modelRefreshSKU(1, id_groups=None)
 
     def checkingFileUpload(self, filename):
         sql = f'''SELECT COUNT(name) FROM file_load WHERE name = "{filename}"'''
@@ -425,7 +426,7 @@ class MainWindow(QMainWindow):
         cur.execute(sql)
         con.commit()
         con.close()
-        self.modelSKU.modelRefreshSKU()
+        self.modelSKU.modelRefreshSKU(1, id_groups=None) #Загрузка файлов в БД
         QMessageBox.information(self, 'Все', 'Все')
 
 
@@ -437,17 +438,18 @@ class MainWindow(QMainWindow):
         hv.hide()
 
 
-    def cbSelectGroup_currentTextChanged(self, name):
+    def cbSelectGroup_currentTextChanged(self, name): # Выбор группы
         print(name)
         sql = f'SELECT id FROM groups WHERE name = "{name}"'
         query = QtSql.QSqlQuery()
         query.exec(sql)
         if query.isActive():
             query.first()
-            id_group = query.value('id')
-        self.modelSKU.modelRefreshSKU(id_group=None)
+            id_groups = query.value('id')
+        self.id_groups = id_groups
+        self.modelSKU.modelRefreshSKU(self.id_company, id_groups)
 
-    def cbSelectCompany_currentTextChanged(self, name):
+    def cbSelectCompany_currentTextChanged(self, name): # Выбор кампании
         print(name)
         sql = f'SELECT id FROM company WHERE name = "{name}"'
         query = QtSql.QSqlQuery()
@@ -455,7 +457,8 @@ class MainWindow(QMainWindow):
         if query.isActive():
             query.first()
             id_company = query.value('id')
-        self.modelSKU.modelRefreshSKU(id_company=None)
+        self.id_company = id_company
+        self.modelSKU.modelRefreshSKU(id_company, self.id_groups)
 
     def btnPrintClicked(self):
         pd = QtPrintSupport.QPrintDialog(self.printer, parent=self)
