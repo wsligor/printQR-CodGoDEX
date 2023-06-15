@@ -393,6 +393,7 @@ class MainWindow(QMainWindow):
             print(type(img_encod))
 
             if self.LabelType == 'DMCodDatePartyNumber':
+
                 img = Image.new('RGB', (354, 236), 'white')
                 img.paste(img_encod, (0, 0))
                 font = ImageFont.truetype('ARIALNBI.TTF', size=32)
