@@ -83,7 +83,7 @@ class threadCodJpgDecode(QThread):
                     crop_img.save(f'crop_img{i+defectCodeCount}.jpg')
             self.signalExec.emit()
 
-        dateToday = date.today()
+        dateToday = date.today().strftime('%d.%m.%Y')
         list_cod_to_BD = []
         for cod in list_cod:
             str_list_cod = (self.id_sku, cod, 0, 0, dateToday)
@@ -191,6 +191,7 @@ class MainWindow(QMainWindow):
         self.deDate = QDateEdit()
         self.deDate.setMinimumWidth(300)
         self.deDate.setDate(date.today())
+        self.deDate.setDisplayFormat('dd.MM.yyyy')
 
         lblCount = QLabel('Количество: ')
         self.sbCount = QSpinBox()
@@ -210,7 +211,6 @@ class MainWindow(QMainWindow):
         lblSelectPrinter = QLabel('Выберите принтер: ')
         self.cbSelectPrinter = QComboBox()
         self.cbSelectPrinter.addItems(QtPrintSupport.QPrinterInfo.availablePrinterNames())
-        # self.cbSelectPrinter.currentTextChanged[str].connect(self.showData)
         layHLabelSelectPrinter = QHBoxLayout()
         layHLabelSelectPrinter.addWidget(lblSelectPrinter)
         layHLabelSelectPrinter.addWidget(self.cbSelectPrinter)
@@ -368,6 +368,7 @@ class MainWindow(QMainWindow):
             sql = f'''INSERT INTO party (name, date_doc, prefix, number) 
                         VALUES ("{nameParty}", "{dateParty}", "{prefixParty}", {numParty})'''
         cur.execute(sql)
+        id_party = cur.lastrowid
         con.commit()
 
         printer = QtPrintSupport.QPrinter(mode=QtPrintSupport.QPrinter.PrinterMode.PrinterResolution)
@@ -380,39 +381,29 @@ class MainWindow(QMainWindow):
         cur.execute(sql)
         codes_bd = cur.fetchall()
 
-        i: int = 0
-
-        for cod in codes_bd:
+        for index, cod in enumerate(codes_bd):
             painter.begin(printer)
             encoded = encode(cod[0], scheme='', size='20x20')
-            sql = f'''UPDATE codes SET print = 1, id_party = {numParty} WHERE id = "{cod[1]}"'''
+            img_encod = Image.frombytes('RGB', (encoded.width, encoded.height), encoded.pixels)
+
+            sql = f'''UPDATE codes SET print = 1, id_party = {id_party}, date_output = "{self.deDate.text()}" WHERE id = "{cod[1]}"'''
             cur.execute(sql)
             con.commit()
 
-            img_encod = Image.frombytes('RGB', (encoded.width, encoded.height), encoded.pixels)
-            print(type(img_encod))
+            img = Image.new('RGB', (354, 236), 'white')
+            img.paste(img_encod, (0, 0))
+            font = ImageFont.truetype('ARIALNBI.TTF', size=32)
+            dtext = ImageDraw.Draw(img)
 
             if self.LabelType == 'DMCodDatePartyNumber':
-
-                img = Image.new('RGB', (354, 236), 'white')
-                img.paste(img_encod, (0, 0))
-                font = ImageFont.truetype('ARIALNBI.TTF', size=32)
-                dtext = ImageDraw.Draw(img)
                 dtext.text((130, 40), self.deDate.text(), font=font, fill=('#1C0606'))
                 dtext.text((130, 80), nameParty, font=font, fill=('#1C0606'))
-                i += 1
-                dtext.text((130, 0), str(i), font=font, fill=('#1C0606'))
-                pixmap = QtGui.QPixmap(ImageQt(img))
-                painter.drawPixmap(100, 50, pixmap)
+                dtext.text((130, 0), str(index+1), font=font, fill=('#1C0606'))
             elif self.LabelType == 'OnlyDMCod':
-                img = Image.new('RGB', (300, 156), 'white')
-                img.paste(img_encod, (0, 0))
-                font = ImageFont.truetype('ARIALNBI.TTF', size=40)
-                dtext = ImageDraw.Draw(img)
-                i += 1
-                dtext.text((130, 0), str(i), font=font, fill=('#1C0606'))
-                pixmap = QtGui.QPixmap(ImageQt(img))
-                painter.drawPixmap(100, 50, pixmap)
+                dtext.text((130, 0), str(index+1), font=font, fill=('#1C0606'))
+
+            pixmap = QtGui.QPixmap(ImageQt(img))
+            painter.drawPixmap(100, 50, pixmap)
             painter.end()
         painter.begin(printer)
         painter.end()
