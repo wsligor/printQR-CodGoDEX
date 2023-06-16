@@ -11,7 +11,7 @@ from PIL import Image as ImagePIL
 from pylibdmtx.pylibdmtx import decode
 from pylibdmtx.pylibdmtx import encode
 
-from PySide6.QtGui import QAction, QGuiApplication, QImage
+from PySide6.QtGui import QAction, QGuiApplication
 from PySide6.QtSql import QSqlQueryModel
 from PySide6.QtWidgets import QMessageBox, QProgressBar
 from PySide6.QtWidgets import QMainWindow, QTableView, QHeaderView, QHBoxLayout, QSpinBox, QPushButton
@@ -24,9 +24,6 @@ from ModelSKU import ModelSKU
 from ToolBar import ToolBar
 from SetupWindow import SetupWindow
 
-
-# TODO Добавить дату выбытия кода
-
 # Масштаб преобразования pdf в jpg = 2.08
 QR_IN_2_008 = (
     (38, 88, 170, 220), (248, 88, 380, 220), (458, 88, 590, 220), (668, 88, 798, 220), (880, 88, 1012, 220),
@@ -37,7 +34,7 @@ QR_IN_2_008 = (
 )
 # Масштаб преобразования pdf в jpg = 1
 QR_IN_1 = (
-    (19,  43, 81, 105), (120,  43, 182, 105), (221,  43, 283, 105), (322,  43, 384, 105), (423,  43, 485, 105),
+    (19, 43, 81, 105), (120, 43, 182, 105), (221, 43, 283, 105), (322, 43, 384, 105), (423, 43, 485, 105),
     (19, 215, 81, 277), (120, 215, 182, 277), (221, 215, 283, 277), (322, 215, 384, 277), (423, 215, 485, 277),
     (19, 387, 81, 449), (120, 387, 182, 449), (221, 387, 283, 449), (322, 387, 384, 449), (423, 387, 485, 449),
     (19, 559, 81, 621), (120, 559, 182, 621), (221, 559, 283, 621), (322, 559, 384, 621), (423, 559, 485, 621)
@@ -60,18 +57,20 @@ class threadCodJpgDecode(QThread):
         self.fileList = []
 
     def run(self):
-        workingDirectory = os.getcwd() + '\\tmp\\'
-        self.fileList = os.listdir(workingDirectory)
+        orderDirectory = os.getcwd() + '\\order\\'
+        tmpDirectory = os.getcwd() + '\\tmp\\'
+        self.fileList = os.listdir(orderDirectory)
         for file in self.fileList:
-            fullFileName = workingDirectory + file
+            fullFileName = orderDirectory + file
             os.remove(fullFileName)
-        self.convert_pdf2img(self.fileName)
-        self.fileList = os.listdir(workingDirectory)
+        self.convert_pdf2img(self.fileName, orderDirectory)
+        self.fileList = os.listdir(orderDirectory)
         self.signalStart.emit(len(self.fileList))
         defectCodeCount: int = 0
         list_cod = []
         for f in self.fileList:
-            filename = workingDirectory + f
+            print(f)
+            filename = orderDirectory + f
             img = ImagePIL.open(filename)
             for i in range(20):
                 crop_img = img.crop(QR_IN_1[i])
@@ -80,7 +79,7 @@ class threadCodJpgDecode(QThread):
                     list_cod.append(data[0].data)
                 else:
                     defectCodeCount += 1
-                    crop_img.save(f'crop_img{i+defectCodeCount}.jpg')
+                    crop_img.save(f'{tmpDirectory}crop_img{i + defectCodeCount}.jpg')
             self.signalExec.emit()
 
         dateToday = date.today().strftime('%d.%m.%Y')
@@ -89,7 +88,7 @@ class threadCodJpgDecode(QThread):
             str_list_cod = (self.id_sku, cod, 0, 0, dateToday)
             list_cod_to_BD.append(str_list_cod)
 
-        con = sl.connect('SFMDEX.db')
+        con = sl.connect("SFMDEX.db")
         cur = con.cursor()
         sql = '''INSERT INTO codes(id_sku, cod, print, id_party, date_load) values(?,?,?,?,?)'''
         cur.executemany(sql, list_cod_to_BD)
@@ -99,16 +98,15 @@ class threadCodJpgDecode(QThread):
         con.close()
         self.signalFinished.emit(len(list_cod_to_BD), defectCodeCount)
 
-    def convert_pdf2img(self, filename: str):
+    @staticmethod
+    def convert_pdf2img(filename: str, orderPath: str):
         """Преобразует PDF в изображение и создает файл за страницей"""
         pdf_in = fitz.open(filename)
-        i = 0
-        for page in pdf_in:
-            i += 1
-            output_file = os.getcwd() + "\\tmp\\order" + str(i) + ".jpg"
+        for index, page in enumerate(pdf_in):
             pix = page.get_pixmap()
-            pix.save(output_file)
+            pix.save(f'{orderPath}order' + str(index) + '.jpg')
         pdf_in.close()
+
 
 class ModelSelectGroup(QSqlQueryModel):
     def __init__(self, parent=None):
@@ -119,12 +117,13 @@ class ModelSelectGroup(QSqlQueryModel):
         sql = 'SELECT name, id FROM groups ORDER BY sort'
         self.setQuery(sql)
 
+
 class ModelSelectCompany(QSqlQueryModel):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.refresdSelectCompany()
+        self.refreshSelectCompany()
 
-    def refresdSelectCompany(self):
+    def refreshSelectCompany(self):
         sql = 'SELECT name, id FROM company ORDER BY id'
         self.setQuery(sql)
 
@@ -132,7 +131,8 @@ class ModelSelectCompany(QSqlQueryModel):
 class MainWindow(QMainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle('Молочное море/Биорич - PrintDM - GoDEX530 - v1.0.3')
+        self.threadOne = None
+        self.setWindowTitle('Молочное море/Биорич - PrintDM - GoDEX530 - v1.0.4')
         self.resize(800, 700)
         self.dlg = None
         self.countProgress = 0
@@ -143,12 +143,10 @@ class MainWindow(QMainWindow):
         self.PrinterControl = ''
 
         main_menu = MainMenu(self)
-        # main_menu.load_file.triggered.connect(self.load_file_triggered)
         main_menu.load_file_two.triggered.connect(self.load_file_two_triggered)
         main_menu.setup.triggered.connect(self.setupDialog_triggered)
         self.setMenuBar(main_menu)
         tool_bar = ToolBar(parent=self)
-        # tool_bar.load_file.triggered.connect(self.load_file_triggered)
         tool_bar.load_file_two.triggered.connect(self.load_file_two_triggered)
         tool_bar.setup.triggered.connect(self.setupDialog_triggered)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, tool_bar)
@@ -164,22 +162,22 @@ class MainWindow(QMainWindow):
         self.modelSelectGrop = ModelSelectGroup()
         self.cbSelectGroup.setModel(self.modelSelectGrop)
         self.cbSelectGroup.currentTextChanged.connect(self.cbSelectGroup_currentTextChanged)
-        layVselectGroup = QVBoxLayout()
-        layVselectGroup.addWidget(lblSelectGroup)
-        layVselectGroup.addWidget(self.cbSelectGroup)
+        layVSelectGroup = QVBoxLayout()
+        layVSelectGroup.addWidget(lblSelectGroup)
+        layVSelectGroup.addWidget(self.cbSelectGroup)
 
         lblSelectCompany = QLabel('Выберите предприятие')
         self.cbSelectCompany = QComboBox()
         self.modelSelectCompany = ModelSelectCompany()
         self.cbSelectCompany.setModel(self.modelSelectCompany)
         self.cbSelectCompany.currentTextChanged.connect(self.cbSelectCompany_currentTextChanged)
-        layVselectCompany = QVBoxLayout()
-        layVselectCompany.addWidget(lblSelectCompany)
-        layVselectCompany.addWidget(self.cbSelectCompany)
+        layVSelectCompany = QVBoxLayout()
+        layVSelectCompany.addWidget(lblSelectCompany)
+        layVSelectCompany.addWidget(self.cbSelectCompany)
 
         layHGroupCompany = QHBoxLayout()
-        layHGroupCompany.addLayout(layVselectGroup)
-        layHGroupCompany.addLayout(layVselectCompany)
+        layHGroupCompany.addLayout(layVSelectGroup)
+        layHGroupCompany.addLayout(layVSelectCompany)
 
         self.tvSKU = QTableView()
         self.modelSKU = ModelSKU()
@@ -239,7 +237,6 @@ class MainWindow(QMainWindow):
         copyGtinAction.triggered.connect(self.copyGtinAction)
         self.tvSKU.addAction(copyGtinAction)
 
-
     def copyGtinAction(self):
         print('copyGtinAction')
         selectIndexTableSKU = self.tvSKU.currentIndex().row()
@@ -247,8 +244,6 @@ class MainWindow(QMainWindow):
 
         clipboard = QGuiApplication.clipboard()
         clipboard.setText(selectGTIN)
-
-
 
     def readConfigINI(self):
         config = configparser.ConfigParser()
@@ -265,7 +260,7 @@ class MainWindow(QMainWindow):
     def load_file_two_triggered(self):
         # print('load_file_two.triggered')
         filename: str = QFileDialog.getOpenFileName(self, 'Открыть файл', os.getcwd(), 'PDF files (*.pdf)')[0]
-        if not filename: #проверка на пустую строку
+        if not filename:  # проверка на пустую строку
             return
         fn = os.path.basename(filename)
         if self.checkingFileUpload(fn):
@@ -386,21 +381,22 @@ class MainWindow(QMainWindow):
             encoded = encode(cod[0], scheme='', size='20x20')
             img_encod = Image.frombytes('RGB', (encoded.width, encoded.height), encoded.pixels)
 
-            sql = f'''UPDATE codes SET print = 1, id_party = {id_party}, date_output = "{self.deDate.text()}" WHERE id = "{cod[1]}"'''
+            sql = f'''UPDATE codes SET print = 1, id_party = {id_party}, date_output = "{self.deDate.text()}" 
+                        WHERE id = "{cod[1]}"'''
             cur.execute(sql)
             con.commit()
 
             img = Image.new('RGB', (354, 236), 'white')
             img.paste(img_encod, (0, 0))
             font = ImageFont.truetype('ARIALNBI.TTF', size=32)
-            dtext = ImageDraw.Draw(img)
+            drawText = ImageDraw.Draw(img)
 
             if self.LabelType == 'DMCodDatePartyNumber':
-                dtext.text((130, 40), self.deDate.text(), font=font, fill=('#1C0606'))
-                dtext.text((130, 80), nameParty, font=font, fill=('#1C0606'))
-                dtext.text((130, 0), str(index+1), font=font, fill=('#1C0606'))
+                drawText.text((130, 40), self.deDate.text(), font=font, fill='#1C0606')
+                drawText.text((130, 80), nameParty, font=font, fill='#1C0606')
+                drawText.text((130, 0), str(index + 1), font=font, fill='#1C0606')
             elif self.LabelType == 'OnlyDMCod':
-                dtext.text((130, 0), str(index+1), font=font, fill=('#1C0606'))
+                drawText.text((130, 0), str(index + 1), font=font, fill='#1C0606')
 
             pixmap = QtGui.QPixmap(ImageQt(img))
             painter.drawPixmap(100, 50, pixmap)
@@ -410,7 +406,8 @@ class MainWindow(QMainWindow):
         con.close()
         self.modelSKU.modelRefreshSKU(self.id_company, self.id_groups)
 
-    def checkingFileUpload(self, filename):
+    @staticmethod
+    def checkingFileUpload(filename):
         sql = f'''SELECT COUNT(name) FROM file_load WHERE name = "{filename}"'''
         con = sl.connect('SFMDEX.db')
         cur = con.cursor()
@@ -428,7 +425,8 @@ class MainWindow(QMainWindow):
         hv = self.tvSKU.verticalHeader()
         hv.hide()
 
-    def cbSelectGroup_currentTextChanged(self, name): # Выбор группы
+    def cbSelectGroup_currentTextChanged(self, name):  # Выбор группы
+        id_groups = None
         sql = f'SELECT id FROM groups WHERE name = "{name}"'
         query = QtSql.QSqlQuery()
         query.exec(sql)
@@ -438,7 +436,8 @@ class MainWindow(QMainWindow):
             self.id_groups = id_groups
         self.modelSKU.modelRefreshSKU(self.id_company, id_groups)
 
-    def cbSelectCompany_currentTextChanged(self, name): # Выбор кампании
+    def cbSelectCompany_currentTextChanged(self, name):  # Выбор кампании
+        id_company = 1
         sql = f'SELECT id FROM company WHERE name = "{name}"'
         query = QtSql.QSqlQuery()
         query.exec(sql)
