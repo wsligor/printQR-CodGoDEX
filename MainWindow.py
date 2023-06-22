@@ -258,12 +258,12 @@ class MainWindow(QMainWindow):
         self.readConfigINI()
 
     def load_file_two_triggered(self):
-        # print('load_file_two.triggered')
         filename: str = QFileDialog.getOpenFileName(self, 'Открыть файл', os.getcwd(), 'PDF files (*.pdf)')[0]
         if not filename:  # проверка на пустую строку
             return
         fn = os.path.basename(filename)
-        if self.checkingFileUpload(fn):
+        result = self.checkingFileUpload(fn)
+        if result:
             QMessageBox.critical(self, 'Внимание', 'Этот файл уже загружен в БД')
             return
         filelist = filename.split('_')
@@ -310,7 +310,7 @@ class MainWindow(QMainWindow):
 
     @QtCore.Slot()
     def threadFinishedTwo(self, codeCount, defectCodeCount):
-        self.statusbar.showMessage(f'Загружено {codeCount}, забраковано {defectCodeCount}', 2500)
+        self.statusbar.showMessage(f'Загружено {codeCount}, забраковано {defectCodeCount}', 5500)
 
     def btnPrint_clicked(self):
         printerName = self.cbSelectPrinter.currentText()
@@ -336,27 +336,27 @@ class MainWindow(QMainWindow):
 
         sql = f'SELECT id, prefix FROM sku WHERE gtin = "{selectGTIN}"'
         cur.execute(sql)
-        id_sku = cur.fetchone()
-        sql = f'SELECT count(cod) FROM codes WHERE id_sku = {id_sku[0]}'
+        id_sku, prefix = cur.fetchone()
+        sql = f'SELECT count(cod) FROM codes WHERE id_sku = {id_sku}'
         cur.execute(sql)
         record = cur.fetchone()
         if self.sbCount.value() > record[0]:
             QMessageBox.information(self, 'Внимание', 'Загрузите коды, не хватает для печати')
             return
 
-        sql = f'''SELECT count(prefix) FROM party WHERE prefix = "{id_sku[1]}" GROUP BY prefix'''
+        sql = f'''SELECT count(prefix) FROM party WHERE prefix = "{prefix}" GROUP BY prefix'''
         cur.execute(sql)
         record = cur.fetchone()
         numParty: int = 1
         if not record:
-            nameParty: str = id_sku[1] + '-' + '001'
+            nameParty: str = id_sku + '-' + '001'
             dateParty = self.deDate.text()
             sql = f'''INSERT INTO party (name, date_doc, prefix, number) 
-                        VALUES ("{nameParty}", "{dateParty}", "{id_sku[1]}", {numParty})'''
+                        VALUES ("{nameParty}", "{dateParty}", "{prefix}", {numParty})'''
         else:
             numParty: int = 1 + record[0]
             numberParty = str(numParty)
-            prefixParty = id_sku[1]
+            prefixParty = prefix
             numberParty = numberParty.zfill(3)
             nameParty = prefixParty + '-' + numberParty
             dateParty = self.deDate.text()
@@ -372,17 +372,18 @@ class MainWindow(QMainWindow):
         printer.setPageSize(page_size)
 
         sql = f'''SELECT cod, id FROM codes 
-                    WHERE id_sku = {id_sku[0]} AND print = 0 ORDER BY date_load ASC LIMIT {self.sbCount.value()}'''
+                    WHERE id_sku = {id_sku} AND print = 0 ORDER BY date_load ASC LIMIT {self.sbCount.value()}'''
         cur.execute(sql)
         codes_bd = cur.fetchall()
 
-        for index, cod in enumerate(codes_bd):
+        for index, codes in enumerate(codes_bd):
+            cod, id_cod = codes
             painter.begin(printer)
-            encoded = encode(cod[0], scheme='', size='20x20')
+            encoded = encode(cod, scheme='', size='20x20')
             img_encod = Image.frombytes('RGB', (encoded.width, encoded.height), encoded.pixels)
 
             sql = f'''UPDATE codes SET print = 1, id_party = {id_party}, date_output = "{self.deDate.text()}" 
-                        WHERE id = "{cod[1]}"'''
+                        WHERE id = "{id_cod}"'''
             cur.execute(sql)
             con.commit()
 
@@ -399,7 +400,7 @@ class MainWindow(QMainWindow):
                 drawText.text((130, 0), str(index + 1), font=font, fill='#1C0606')
 
             pixmap = QtGui.QPixmap(ImageQt(img))
-            painter.drawPixmap(100, 50, pixmap)
+            painter.drawPixmap(110, 70, pixmap)
             painter.end()
         painter.begin(printer)
         painter.end()
@@ -413,10 +414,11 @@ class MainWindow(QMainWindow):
         cur = con.cursor()
         cur.execute(sql)
         row = cur.fetchone()
-        if row[0] == 0:
-            return False
-        else:
-            return True
+        return row[0]
+        # if row == 0:
+        #     return False
+        # else:
+        #     return True
 
     def refreshSKU(self):
         hh = self.tvSKU.horizontalHeader()
