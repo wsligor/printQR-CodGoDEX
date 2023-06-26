@@ -379,7 +379,7 @@ class MainWindow(QMainWindow):
         for index, codes in enumerate(codes_bd):
             cod, id_cod = codes
             painter.begin(printer)
-            encoded = encode(cod, scheme='', size='20x20')
+            encoded = encode(cod, scheme='', size='26x26')
             img_encod = Image.frombytes('RGB', (encoded.width, encoded.height), encoded.pixels)
 
             sql = f'''UPDATE codes SET print = 1, id_party = {id_party}, date_output = "{self.deDate.text()}" 
@@ -397,13 +397,14 @@ class MainWindow(QMainWindow):
                 drawText.text((130, 80), nameParty, font=font, fill='#1C0606')
                 drawText.text((130, 0), str(index + 1), font=font, fill='#1C0606')
             elif self.LabelType == 'OnlyDMCod':
-                drawText.text((130, 0), str(index + 1), font=font, fill='#1C0606')
+                drawText.text((160, 0), str(index + 1), font=font, fill='#1C0606')
 
             pixmap = QtGui.QPixmap(ImageQt(img))
             painter.drawPixmap(110, 70, pixmap)
             painter.end()
         painter.begin(printer)
         painter.end()
+        img.save('img.jpg')
         con.close()
         self.modelSKU.modelRefreshSKU(self.id_company, self.id_groups)
 
