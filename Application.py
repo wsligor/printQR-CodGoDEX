@@ -9,4 +9,4 @@ class Application(QApplication):
         self.DataBase.setDatabaseName('SFMDEX.db')
         print('BD')
         if not self.DataBase.open():
-            QMessageBox.critical(self, 'Внимание', 'Ошибка подключения к БД')
+            QMessageBox.critical('Внимание', 'Ошибка подключения к БД')

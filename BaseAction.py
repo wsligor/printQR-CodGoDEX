@@ -1,5 +1,9 @@
+import os
+
+
+from PySide6 import QtSql
 from PySide6.QtGui import QAction, QIcon
-from PySide6.QtWidgets import QMessageBox
+from PySide6.QtWidgets import QMessageBox, QFileDialog
 
 
 class BaseAction(QAction):
@@ -34,6 +38,8 @@ class BaseAction(QAction):
         self.setup.setStatusTip('Настроить программу')
         self.setup.setToolTip('Настроить программу')
 
+
+
     def about_qt_triggered(self):
         QMessageBox.aboutQt(self)
 
@@ -41,3 +47,6 @@ class BaseAction(QAction):
         title = 'О программе'
         text = 'О программе'
         QMessageBox.about(self, title, text)
+
+
+
