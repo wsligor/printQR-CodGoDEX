@@ -1,28 +1,30 @@
-import os
-import datetime
-import fitz
 import configparser
+import datetime
+import os
+import shutil
 import sqlite3 as sl
-
 from datetime import date
+
+import fitz
 from PIL import Image, ImageFont, ImageDraw
-from PIL.ImageQt import ImageQt
 from PIL import Image as ImagePIL
+from PIL.ImageQt import ImageQt
+from PySide6 import QtPrintSupport, QtGui, QtCore, QtSql
+from PySide6.QtCore import Qt, QThread, QModelIndex
+from PySide6.QtGui import QAction, QGuiApplication
+from PySide6.QtSql import QSqlQueryModel
+from PySide6.QtWidgets import QLabel, QStatusBar, QComboBox, QWidget, QVBoxLayout, QFileDialog, QDateEdit
+from PySide6.QtWidgets import QMainWindow, QTableView, QHeaderView, QHBoxLayout, QSpinBox, QPushButton
+from PySide6.QtWidgets import QMessageBox, QProgressBar, QCheckBox, QLineEdit
 from pylibdmtx.pylibdmtx import decode
 from pylibdmtx.pylibdmtx import encode
 
-from PySide6.QtGui import QAction, QGuiApplication
-from PySide6.QtSql import QSqlQueryModel
-from PySide6.QtWidgets import QMessageBox, QProgressBar
-from PySide6.QtWidgets import QMainWindow, QTableView, QHeaderView, QHBoxLayout, QSpinBox, QPushButton
-from PySide6.QtWidgets import QLabel, QStatusBar, QComboBox, QWidget, QVBoxLayout, QFileDialog, QDateEdit
-from PySide6.QtCore import Qt, QThread
-from PySide6 import QtPrintSupport, QtGui, QtCore, QtSql
-
 from MainMenu import MainMenu
 from ModelSKU import ModelSKU
-from ToolBar import ToolBar
 from SetupWindow import SetupWindow
+from ToolBar import ToolBar
+
+# TODO Добавить дату выбытия кода
 
 # Масштаб преобразования pdf в jpg = 2.08
 QR_IN_2_008 = (
@@ -34,13 +36,17 @@ QR_IN_2_008 = (
 )
 # Масштаб преобразования pdf в jpg = 1
 QR_IN_1 = (
-    (19, 43, 81, 105), (120, 43, 182, 105), (221, 43, 283, 105), (322, 43, 384, 105), (423, 43, 485, 105),
-    (19, 215, 81, 277), (120, 215, 182, 277), (221, 215, 283, 277), (322, 215, 384, 277), (423, 215, 485, 277),
-    (19, 387, 81, 449), (120, 387, 182, 449), (221, 387, 283, 449), (322, 387, 384, 449), (423, 387, 485, 449),
-    (19, 559, 81, 621), (120, 559, 182, 621), (221, 559, 283, 621), (322, 559, 384, 621), (423, 559, 485, 621)
+    (72, 168, 327, 424), (476, 168, 732, 424), (878, 168, 1140, 424), (1280, 168, 1540, 424), (1686, 168, 1948, 424),
+    (72, 852, 327, 1126), (476, 852, 732, 1126), (878, 852, 1140, 1126), (1280, 852, 1540, 1126),
+    (1686, 852, 1948, 1126),
+    (72, 1542, 327, 1802), (476, 1542, 732, 1802), (878, 1542, 1140, 1802), (1280, 1542, 1540, 1802),
+    (1686, 1542, 1948, 1802),
+    (72, 2230, 327, 2490), (476, 2230, 732, 2490), (878, 2230, 1140, 2490), (1280, 2230, 1540, 2490),
+    (1686, 2230, 1948, 2490)
 )
 
 
+# noinspection PyPep8Naming
 class threadCodJpgDecode(QThread):
     running = False
     signalStart = QtCore.Signal(int)
@@ -57,40 +63,63 @@ class threadCodJpgDecode(QThread):
         self.fileList = []
 
     def run(self):
-        orderDirectory = os.getcwd() + '\\order\\'
-        tmpDirectory = os.getcwd() + '\\tmp\\'
-        self.fileList = os.listdir(orderDirectory)
+        app_dir = os.getcwd()
+        working_dir = f'{app_dir}/tmp/'
+        source_filename = self.fileName
+        dest_filename = f'{app_dir}\\temp\\'
+        print(f'source_filename= {source_filename}')
+        print(f'dest_filename = {dest_filename}')
+
+        self.fileList = os.listdir(working_dir)
         for file in self.fileList:
-            fullFileName = orderDirectory + file
+            fullFileName = working_dir + file
             os.remove(fullFileName)
-        self.convert_pdf2img(self.fileName, orderDirectory)
-        self.fileList = os.listdir(orderDirectory)
+        self.convert_pdf2img(self.fileName)
+        self.fileList = os.listdir(working_dir)
         self.signalStart.emit(len(self.fileList))
         defectCodeCount: int = 0
-        list_cod = []
+        dict_filename = {}
+
         for f in self.fileList:
-            print(f)
-            filename = orderDirectory + f
+            filename = working_dir + f
             img = ImagePIL.open(filename)
             for i in range(20):
                 crop_img = img.crop(QR_IN_1[i])
+                crop_img.save(f'crop_img{i}.png')
+                filename = f'crop_img{i}.png'
                 data = decode(crop_img)
+                # print(data, i)
                 if data:
-                    list_cod.append(data[0].data)
+                    cod = data[0].data
+                    dict_filename[cod] = filename
                 else:
                     defectCodeCount += 1
-                    crop_img.save(f'{tmpDirectory}crop_img{i + defectCodeCount}.jpg')
             self.signalExec.emit()
+
+        try:
+            dest_filename = shutil.move(source_filename, dest_filename)
+            print("File is moved successfully to: ", dest_filename)
+        except IsADirectoryError:
+            print("Source is a file but destination is a directory.")
+        except NotADirectoryError:
+            print("Source is a directory but destination is a file.")
+        except PermissionError:
+            print("Operation not permitted.")
+        except OSError as error:
+            print(error)
 
         dateToday = date.today().strftime('%d.%m.%Y')
         list_cod_to_BD = []
-        for cod in list_cod:
-            str_list_cod = (self.id_sku, cod, 0, 0, dateToday)
+        for key, value in dict_filename.items():
+            print(f'key = {key}, value = {value}')
+            with open(value, 'rb') as file:
+                blob_data = file.read()
+            str_list_cod = (self.id_sku, key, 0, 0, dateToday, blob_data)
             list_cod_to_BD.append(str_list_cod)
 
-        con = sl.connect("SFMDEX.db")
+        con = sl.connect('SFMDEX.db')
         cur = con.cursor()
-        sql = '''INSERT INTO codes(id_sku, cod, print, id_party, date_load) values(?,?,?,?,?)'''
+        sql = '''INSERT INTO codes(id_sku, cod, print, id_party, date_load, cod_img) values(?,?,?,?,?,?)'''
         cur.executemany(sql, list_cod_to_BD)
         sql = f'''INSERT INTO file_load (name) values("{self.fn}")'''
         cur.execute(sql)
@@ -98,13 +127,16 @@ class threadCodJpgDecode(QThread):
         con.close()
         self.signalFinished.emit(len(list_cod_to_BD), defectCodeCount)
 
-    @staticmethod
-    def convert_pdf2img(filename: str, orderPath: str):
+    def convert_pdf2img(self, filename: str):
         """Преобразует PDF в изображение и создает файл за страницей"""
         pdf_in = fitz.open(filename)
-        for index, page in enumerate(pdf_in):
-            pix = page.get_pixmap()
-            pix.save(f'{orderPath}order' + str(index) + '.jpg')
+        i = 0
+        mat = fitz.Matrix(4, 4)
+        for page in pdf_in:
+            i += 1
+            output_file = os.getcwd() + "\\tmp\\order" + str(i) + ".jpg"
+            pix = page.get_pixmap(matrix=mat)
+            pix.save(output_file)
         pdf_in.close()
 
 
@@ -121,18 +153,18 @@ class ModelSelectGroup(QSqlQueryModel):
 class ModelSelectCompany(QSqlQueryModel):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.refreshSelectCompany()
+        self.refresdSelectCompany()
 
-    def refreshSelectCompany(self):
+    def refresdSelectCompany(self):
         sql = 'SELECT name, id FROM company ORDER BY id'
         self.setQuery(sql)
 
 
+# noinspection PyPep8Naming
 class MainWindow(QMainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.threadOne = None
-        self.setWindowTitle('Молочное море/Биорич - PrintDM - GoDEX530 - v1.0.4')
+        self.setWindowTitle('Молочное море/Биорич - PrintDM - GoDEX530 - v1.0.3')
         self.resize(800, 700)
         self.dlg = None
         self.countProgress = 0
@@ -141,12 +173,15 @@ class MainWindow(QMainWindow):
         self.id_groups = None
         self.LabelType = ''
         self.PrinterControl = ''
+        self.selectIdTableView = ''
 
         main_menu = MainMenu(self)
+        # main_menu.load_file.triggered.connect(self.load_file_triggered)
         main_menu.load_file_two.triggered.connect(self.load_file_two_triggered)
         main_menu.setup.triggered.connect(self.setupDialog_triggered)
         self.setMenuBar(main_menu)
         tool_bar = ToolBar(parent=self)
+        # tool_bar.load_file.triggered.connect(self.load_file_triggered)
         tool_bar.load_file_two.triggered.connect(self.load_file_two_triggered)
         tool_bar.setup.triggered.connect(self.setupDialog_triggered)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, tool_bar)
@@ -157,50 +192,75 @@ class MainWindow(QMainWindow):
         self.progressBar = QProgressBar()
         self.progressBar.setTextVisible(False)
 
+        # noinspection PyPep8Naming
         lblSelectGroup = QLabel('Выберите группу:')
         self.cbSelectGroup = QComboBox()
         self.modelSelectGrop = ModelSelectGroup()
         self.cbSelectGroup.setModel(self.modelSelectGrop)
         self.cbSelectGroup.currentTextChanged.connect(self.cbSelectGroup_currentTextChanged)
-        layVSelectGroup = QVBoxLayout()
-        layVSelectGroup.addWidget(lblSelectGroup)
-        layVSelectGroup.addWidget(self.cbSelectGroup)
+        # noinspection PyPep8Naming
+        layVselectGroup = QVBoxLayout()
+        layVselectGroup.addWidget(lblSelectGroup)
+        layVselectGroup.addWidget(self.cbSelectGroup)
 
         lblSelectCompany = QLabel('Выберите предприятие')
         self.cbSelectCompany = QComboBox()
         self.modelSelectCompany = ModelSelectCompany()
         self.cbSelectCompany.setModel(self.modelSelectCompany)
         self.cbSelectCompany.currentTextChanged.connect(self.cbSelectCompany_currentTextChanged)
-        layVSelectCompany = QVBoxLayout()
-        layVSelectCompany.addWidget(lblSelectCompany)
-        layVSelectCompany.addWidget(self.cbSelectCompany)
+        layVselectCompany = QVBoxLayout()
+        layVselectCompany.addWidget(lblSelectCompany)
+        layVselectCompany.addWidget(self.cbSelectCompany)
 
         layHGroupCompany = QHBoxLayout()
-        layHGroupCompany.addLayout(layVSelectGroup)
-        layHGroupCompany.addLayout(layVSelectCompany)
+        layHGroupCompany.addLayout(layVselectGroup)
+        layHGroupCompany.addLayout(layVselectCompany)
 
         self.tvSKU = QTableView()
         self.modelSKU = ModelSKU()
         self.tvSKU.setModel(self.modelSKU)
         self.tvSKU.setSelectionBehavior(self.tvSKU.SelectionBehavior.SelectRows)
         self.refreshSKU()
+        self.tvSKU.clicked.connect(self.tvSKU_clicked)
+
+        self.strTableViewSelect = 'Строка таблицы:'
+        self.lblSelectIdTableView = QLabel()
+        self.lblSelectIdTableView.setText(self.strTableViewSelect)
+
+        layHSelectIdTableView = QHBoxLayout()
+        layHSelectIdTableView.addWidget(self.lblSelectIdTableView)
 
         lblDate = QLabel('Дата: ')
         self.deDate = QDateEdit()
-        self.deDate.setMinimumWidth(300)
+        self.deDate.setMinimumWidth(150)
         self.deDate.setDate(date.today())
         self.deDate.setDisplayFormat('dd.MM.yyyy')
+        self.deDate.setCalendarPopup(True)
+
+        lblParty = QLabel('Партия: ')
+        self.leParty = QLineEdit()
+        self.leParty.setPlaceholderText('Введите номер партии')
 
         lblCount = QLabel('Количество: ')
         self.sbCount = QSpinBox()
         self.sbCount.setValue(1)
-        self.sbCount.setMinimumWidth(300)
+        self.sbCount.setMaximum(999)
+        self.sbCount.setMinimumWidth(100)
+
+        lblBigDM = QLabel('Большой DM: ')
+        self.cbBigDM = QCheckBox("Нет")
+        self.cbBigDM.setChecked(True)
+        self.cbBigDM.clicked.connect(self.cbBigDM_clicked)
 
         layHDateDate = QHBoxLayout()
         layHDateDate.addWidget(lblDate)
         layHDateDate.addWidget(self.deDate)
+        layHDateDate.addWidget(lblParty)
+        layHDateDate.addWidget(self.leParty)
         layHDateDate.addWidget(lblCount)
         layHDateDate.addWidget(self.sbCount)
+        layHDateDate.addWidget(lblBigDM)
+        layHDateDate.addWidget(self.cbBigDM)
         layHDateDate.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
         btnPrint = QPushButton('Печать')
@@ -217,6 +277,7 @@ class MainWindow(QMainWindow):
         layV.addWidget(self.progressBar)
         layV.addLayout(layHGroupCompany)
         layV.addWidget(self.tvSKU)
+        layV.addLayout(layHSelectIdTableView)
         layV.addLayout(layHDateDate)
         layV.addLayout(layHLabelSelectPrinter)
         layV.addWidget(btnPrint)
@@ -236,6 +297,20 @@ class MainWindow(QMainWindow):
         copyGtinAction = QAction('копировать GTIN', self)
         copyGtinAction.triggered.connect(self.copyGtinAction)
         self.tvSKU.addAction(copyGtinAction)
+
+    def tvSKU_clicked(self, index: QModelIndex):
+        """
+        Проверка изменения строки таблицы.
+        При изменении - обнуление номера партии.
+        """
+        data = {}
+        row = index.row()
+        for i in range(self.tvSKU.model().columnCount()):
+            data[i] = self.tvSKU.model().index(row, i).data()
+        if not self.selectIdTableView == row:
+            self.selectIdTableView = index.row()
+            self.leParty.setText('')
+        self.lblSelectIdTableView.setText(f'{self.strTableViewSelect} id - {data[0]}, наименование - {data[1]}')
 
     def copyGtinAction(self):
         print('copyGtinAction')
@@ -258,12 +333,13 @@ class MainWindow(QMainWindow):
         self.readConfigINI()
 
     def load_file_two_triggered(self):
-        filename: str = QFileDialog.getOpenFileName(self, 'Открыть файл', os.getcwd(), 'PDF files (*.pdf)')[0]
+        app_dir = os.getcwd()
+        dir_load = f'{app_dir}/dm'
+        filename: str = QFileDialog.getOpenFileName(self, 'Открыть файл', dir_load, 'PDF files (*.pdf)')[0]
         if not filename:  # проверка на пустую строку
             return
         fn = os.path.basename(filename)
-        result = self.checkingFileUpload(fn)
-        if result:
+        if self.checkingFileUpload(fn):
             QMessageBox.critical(self, 'Внимание', 'Этот файл уже загружен в БД')
             return
         filelist = filename.split('_')
@@ -289,6 +365,9 @@ class MainWindow(QMainWindow):
         self.threadOne.signalFinished.connect(self.threadFinishedTwo)
         self.threadOne.finished.connect(self.threadFinishedOne)
         self.threadOne.start()
+        source = f'{app_dir}/dm/{filename}'
+        dest = f'{app_dir}/temp/{filename}'
+        print(f'source={source}, dest={dest}')
 
     @QtCore.Slot()
     def threadStartOne(self, maxValueProgressBar):
@@ -310,7 +389,15 @@ class MainWindow(QMainWindow):
 
     @QtCore.Slot()
     def threadFinishedTwo(self, codeCount, defectCodeCount):
-        self.statusbar.showMessage(f'Загружено {codeCount}, забраковано {defectCodeCount}', 5500)
+        self.statusbar.showMessage(f'Загружено {codeCount}, забраковано {defectCodeCount}', 2500)
+
+    def cbBigDM_clicked(self):
+        print(self.cbBigDM.isChecked())
+        if self.cbBigDM.isChecked():
+            self.cbBigDM.setText('Да')
+        else:
+            self.cbBigDM.setText('Нет')
+        pass
 
     def btnPrint_clicked(self):
         printerName = self.cbSelectPrinter.currentText()
@@ -319,9 +406,9 @@ class MainWindow(QMainWindow):
             return
         dt = datetime.datetime.strptime(self.deDate.text(), "%d.%m.%Y")
         current_date = datetime.datetime.today() - datetime.timedelta(days=1)
-        if dt < current_date:
-            QMessageBox.critical(self, 'Внимание', 'Измените дату')
-            return
+        # if dt < current_date:
+        #     QMessageBox.critical(self, 'Внимание', 'Измените дату')
+        #     return
         if int(self.sbCount.text()) == 0:
             QMessageBox.critical(self, 'Внимание', 'Введите количество')
             return
@@ -330,33 +417,36 @@ class MainWindow(QMainWindow):
         if selectIndexTableSKU == -1:
             QMessageBox.information(self, 'Внимание', 'Выделите строку для печати')
             return
+        if not self.leParty.text():
+            QMessageBox.information(self, 'Внимание', 'Введите номер партии')
+            return
 
         con = sl.connect('SFMDEX.db')
         cur = con.cursor()
 
         sql = f'SELECT id, prefix FROM sku WHERE gtin = "{selectGTIN}"'
         cur.execute(sql)
-        id_sku, prefix = cur.fetchone()
-        sql = f'SELECT count(cod) FROM codes WHERE id_sku = {id_sku}'
+        id_sku = cur.fetchone()
+        sql = f'SELECT count(cod) FROM codes WHERE id_sku = {id_sku[0]}'
         cur.execute(sql)
         record = cur.fetchone()
         if self.sbCount.value() > record[0]:
             QMessageBox.information(self, 'Внимание', 'Загрузите коды, не хватает для печати')
             return
 
-        sql = f'''SELECT count(prefix) FROM party WHERE prefix = "{prefix}" GROUP BY prefix'''
+        sql = f'''SELECT count(prefix) FROM party WHERE prefix = "{id_sku[1]}" GROUP BY prefix'''
         cur.execute(sql)
         record = cur.fetchone()
         numParty: int = 1
         if not record:
-            nameParty: str = id_sku + '-' + '001'
+            nameParty: str = id_sku[1] + '-' + '001'
             dateParty = self.deDate.text()
             sql = f'''INSERT INTO party (name, date_doc, prefix, number) 
-                        VALUES ("{nameParty}", "{dateParty}", "{prefix}", {numParty})'''
+                        VALUES ("{nameParty}", "{dateParty}", "{id_sku[1]}", {numParty})'''
         else:
             numParty: int = 1 + record[0]
             numberParty = str(numParty)
-            prefixParty = prefix
+            prefixParty = id_sku[1]
             numberParty = numberParty.zfill(3)
             nameParty = prefixParty + '-' + numberParty
             dateParty = self.deDate.text()
@@ -371,55 +461,191 @@ class MainWindow(QMainWindow):
         page_size = QtGui.QPageSize(QtCore.QSize(92, 57))
         printer.setPageSize(page_size)
 
-        sql = f'''SELECT cod, id FROM codes 
-                    WHERE id_sku = {id_sku} AND print = 0 ORDER BY date_load ASC LIMIT {self.sbCount.value()}'''
+        sql = f'''SELECT id, cod, cod_img FROM codes 
+                    WHERE id_sku = {id_sku[0]} AND print = 0 ORDER BY date_load ASC LIMIT {self.sbCount.value()}'''
         cur.execute(sql)
         codes_bd = cur.fetchall()
 
-        for index, codes in enumerate(codes_bd):
-            cod, id_cod = codes
+        for index, value in enumerate(codes_bd):
+            print(index, value[0], value[1])
             painter.begin(printer)
-            encoded = encode(cod, scheme='', size='26x26')
+            if self.cbBigDM.isChecked():
+                encoded = encode(value[1], scheme='', size='36x36')
+            else:
+                encoded = encode(value[1], scheme='', size='20x20')
             img_encod = Image.frombytes('RGB', (encoded.width, encoded.height), encoded.pixels)
+            img_encod = Image.frombytes('RGB', (encoded.width, encoded.height), encoded.pixels)
+            img_encod.save('fr.jpg')
 
-            sql = f'''UPDATE codes SET print = 1, id_party = {id_party}, date_output = "{self.deDate.text()}" 
-                        WHERE id = "{id_cod}"'''
+            sql = f'''UPDATE codes SET print = 1, id_party = {id_party}, date_output = "{self.deDate.text()}" WHERE id = "{value[0]}"'''
             cur.execute(sql)
             con.commit()
 
-            img = Image.new('RGB', (354, 236), 'white')
-            img.paste(img_encod, (0, 0))
-            font = ImageFont.truetype('ARIALNBI.TTF', size=32)
-            drawText = ImageDraw.Draw(img)
+            # img = Image.new('RGB', (354, 236), 'white')
+            # img.paste(img_encod, (0, 0))
+            # font = ImageFont.truetype('ARIALNBI.TTF', size=32)
+            # dtext = ImageDraw.Draw(img)
 
+            # TODO Периписать на CASE
             if self.LabelType == 'DMCodDatePartyNumber':
-                drawText.text((130, 40), self.deDate.text(), font=font, fill='#1C0606')
-                drawText.text((130, 80), nameParty, font=font, fill='#1C0606')
-                drawText.text((130, 0), str(index + 1), font=font, fill='#1C0606')
-            elif self.LabelType == 'OnlyDMCod':
-                drawText.text((160, 0), str(index + 1), font=font, fill='#1C0606')
+                img = Image.new('RGB', (354, 236), 'white')
+                img.paste(img_encod, (0, 0))
+                font = ImageFont.truetype('ARIALNBI.TTF', size=32)
+                dtext = ImageDraw.Draw(img)
+                dtext.text((130, 40), self.deDate.text(), font=font, fill=('#1C0606'))
+                dtext.text((130, 80), nameParty, font=font, fill=('#1C0606'))
+                dtext.text((130, 0), str(index + 1), font=font, fill=('#1C0606'))
+                pixmap = QtGui.QPixmap(ImageQt(img))
+                img.save('fg.jpg')
+                if self.cbBigDM.isChecked():
+                    painter.drawPixmap(0, 30, pixmap)
+                else:
+                    painter.drawPixmap(-10, 70, pixmap)
 
-            pixmap = QtGui.QPixmap(ImageQt(img))
-            painter.drawPixmap(110, 70, pixmap)
-            painter.end()
-        painter.begin(printer)
-        painter.end()
-        img.save('img.jpg')
+                if self.LabelType == 'DMCodColostrum':
+                    print('DMCodColostrum2')
+                    painter.drawPixmap(0, 50, pixmap)
+                painter.end()
+
+            elif self.LabelType == 'DMCodLactofera':
+                production_date = self.deDate.text()
+                party = self.leParty.text()
+                img = Image.new('RGB', (354, 236), 'white')
+                im = Image.new('RGB', (354, 236), 'white')
+                font = ImageFont.truetype('ARIALNBI.TTF', size=32)
+                dtext = ImageDraw.Draw(im)
+                dtext.text((100, 140), f'{production_date}', font=font, fill=('#1C0606'))
+                # dtext.text((120, 0), self.deDate.text(), font=font, fill=('#1C0606'))
+                dtext.text((100, 180), f'{party:>10}', font=font, fill=('#1C0606'))
+                img = im.rotate(270, expand=False, fillcolor='white')
+                img.save('fgr.jpg')
+                img.paste(img_encod, (150, 0))
+                # dtext.text((130, 0), str(index+1), font=font, fill=('#1C0606'))
+                pixmap = QtGui.QPixmap(ImageQt(img))
+                img.save('fg.jpg')
+                if self.cbBigDM.isChecked():
+                    painter.drawPixmap(-30, 25, pixmap)
+                else:
+                    painter.drawPixmap(-20, 50, pixmap)
+
+                if self.LabelType == 'DMCodColostrum':
+                    print('DMCodColostrum2')
+                    painter.drawPixmap(0, 50, pixmap)
+                painter.end()
+
+
+            elif self.LabelType == 'DMCodColostrum':
+                img = Image.new('RGB', (260, 200), 'white')
+                im = Image.new('RGB', (200, 260), 'white')
+                im.paste(img_encod, (0, 0))
+                font = ImageFont.truetype('ARIALNBI.TTF', size=32)
+                dtext = ImageDraw.Draw(im)
+                dtext.text((20, 198), '25.12.2023', font=font, fill=('#1C0606'))
+                # dtext.text((120, 0), self.deDate.text(), font=font, fill=('#1C0606'))
+                dtext.text((20, 230), '        027', font=font, fill=('#1C0606'))
+                im.save('im.jpg')
+                img = im.rotate(90, expand=True, fillcolor='white')
+                img.save('fg1.jpg')
+                # img.paste(img_encod, (0, 0))
+                # img_encod.paste(img)
+                # dtext.text((130, 0), str(index+1), font=font, fill=('#1C0606'))
+                pixmap = QtGui.QPixmap(ImageQt(img))
+                img.save('fg.jpg')
+                img_encod.save('img_encod.jpg')
+                if self.cbBigDM.isChecked():
+                    painter.drawPixmap(30, 20, pixmap)
+                else:
+                    painter.drawPixmap(-30, 30, pixmap)
+
+                # if self.LabelType == 'DMCodColostrum':
+                #     print('DMCodColostrum2')
+                #     painter.drawPixmap(0, 50, pixmap)
+                painter.end()
+
+
+            elif self.LabelType == 'OnlyDMCod':
+                img = Image.new('RGB', (354, 266), 'white')
+                img.paste(img_encod, (100, 0))
+                font = ImageFont.truetype('ARIALNBI.TTF', size=32)
+                dtext = ImageDraw.Draw(img)
+                dtext.text((130, 0), str(index + 1), font=font, fill=('#1C0606'))
+                pixmap = QtGui.QPixmap(ImageQt(img))
+                img.save('fg.jpg')
+                if self.cbBigDM.isChecked():
+                    painter.drawPixmap(-10, 20, pixmap)
+                else:
+                    painter.drawPixmap(0, 0, pixmap)
+
+                if self.LabelType == 'DMCodColostrum':
+                    print('DMCodColostrum2')
+                    painter.drawPixmap(0, 40, pixmap)
+                painter.end()
+
+            elif self.LabelType == 'DMCodDate20x20':
+                img = Image.new('RGB', (354, 236), 'white')
+                img.paste(img_encod, (60, 0))
+                font = ImageFont.truetype('ARIALNBI.TTF', size=32)
+                dtext = ImageDraw.Draw(img)
+                dtext.text((50, 115), self.deDate.text(), font=font, fill=('#1C0606'))
+                pixmap = QtGui.QPixmap(ImageQt(img))
+                img.save('fg.jpg')
+                if self.cbBigDM.isChecked():
+                    painter.drawPixmap(0, 30, pixmap)
+                else:
+                    painter.drawPixmap(-10, 70, pixmap)
+
+                if self.LabelType == 'DMCodColostrum':
+                    print('DMCodColostrum2')
+                    painter.drawPixmap(0, 50, pixmap)
+                painter.end()
+
+            elif self.LabelType == 'DMFoodMail':
+                print('FoodMail')
+                with open('cod.png', 'wb') as file:
+                    file.write(value[2])
+
+                img_ = Image.open('cod.png')
+                wd, ht = img_.size
+                print(wd, ht)
+                wd = int(wd / 2)
+                ht = int(ht / 2)
+                print(wd, ht)
+                img_encod = img_.resize((wd, ht))
+
+                img = Image.new('RGB', (354, 236), 'white')
+                img.paste(img_encod, (135, 0))
+                # font = ImageFont.truetype('ARIALNBI.TTF', size=32)
+                # dtext = ImageDraw.Draw(img)
+                # dtext.text((130, 40), self.deDate.text(), font=font, fill=('#1C0606'))
+                # dtext.text((130, 80), nameParty, font=font, fill=('#1C0606'))
+                # dtext.text((130, 0), str(index+1), font=font, fill=('#1C0606'))
+                pixmap = QtGui.QPixmap(ImageQt(img))
+                img.save('fg.jpg')
+                if self.cbBigDM.isChecked():
+                    painter.drawPixmap(0, 30, pixmap)
+                else:
+                    painter.drawPixmap(-10, 45, pixmap)
+
+                if self.LabelType == 'DMCodColostrum':
+                    print('DMCodColostrum2')
+                    painter.drawPixmap(0, 50, pixmap)
+                painter.end()
+
+        # painter.begin(printer)
+        # painter.end()
         con.close()
         self.modelSKU.modelRefreshSKU(self.id_company, self.id_groups)
 
-    @staticmethod
-    def checkingFileUpload(filename):
+    def checkingFileUpload(self, filename):
         sql = f'''SELECT COUNT(name) FROM file_load WHERE name = "{filename}"'''
         con = sl.connect('SFMDEX.db')
         cur = con.cursor()
         cur.execute(sql)
         row = cur.fetchone()
-        return row[0]
-        # if row == 0:
-        #     return False
-        # else:
-        #     return True
+        if row[0] == 0:
+            return False
+        else:
+            return True
 
     def refreshSKU(self):
         hh = self.tvSKU.horizontalHeader()
@@ -429,7 +655,6 @@ class MainWindow(QMainWindow):
         hv.hide()
 
     def cbSelectGroup_currentTextChanged(self, name):  # Выбор группы
-        id_groups = None
         sql = f'SELECT id FROM groups WHERE name = "{name}"'
         query = QtSql.QSqlQuery()
         query.exec(sql)
@@ -440,7 +665,6 @@ class MainWindow(QMainWindow):
         self.modelSKU.modelRefreshSKU(self.id_company, id_groups)
 
     def cbSelectCompany_currentTextChanged(self, name):  # Выбор кампании
-        id_company = 1
         sql = f'SELECT id FROM company WHERE name = "{name}"'
         query = QtSql.QSqlQuery()
         query.exec(sql)

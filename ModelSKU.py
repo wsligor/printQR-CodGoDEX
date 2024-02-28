@@ -2,6 +2,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtSql import QSqlQueryModel
 
 
+# noinspection PyPep8Naming
 class ModelSKU(QSqlQueryModel):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -15,7 +16,7 @@ class ModelSKU(QSqlQueryModel):
         if id_company is None:
             id_company = 1
         match id_groups:
-            case id_groups if id_groups == None:
+            case id_groups if id_groups is None:
                 sql = f'''SELECT gtin, name, COUNT(id_sku) as codes 
                             FROM sku LEFT OUTER JOIN codes
                             ON (sku.id = codes.id_sku)

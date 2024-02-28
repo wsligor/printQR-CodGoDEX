@@ -23,9 +23,25 @@ class SetupWindow(QDialog):
         self.rbDMCodDatePartyNumber = QRadioButton('DM код + дата + партия + №')
         self.rbDMCodDatePartyNumber.setToolTip('DMCodDatePartyNumber')
 
+        self.rbDMCodDate20x20 = QRadioButton('DM код + дата, 20х20')
+        self.rbDMCodDate20x20.setToolTip('DMCodDate20x20')
+
+        self.rbDMCodLactofera = QRadioButton('Lactofera+Metalakt')
+        self.rbDMCodLactofera.setToolTip('DMCodLactofera')
+
+        self.rdDMCodColostrum = QRadioButton('Colostrum')
+        self.rdDMCodColostrum.setToolTip('DMCodColostrum')
+
+        self.rdDMFoodMail = QRadioButton('FoodMail')
+        self.rdDMFoodMail.setToolTip('DMFoodMail')
+
         self.btgLabelType = QButtonGroup()
         self.btgLabelType.addButton(self.rbOnlyDMCod)
         self.btgLabelType.addButton(self.rbDMCodDatePartyNumber)
+        self.btgLabelType.addButton(self.rbDMCodDate20x20)
+        self.btgLabelType.addButton(self.rbDMCodLactofera)
+        self.btgLabelType.addButton(self.rdDMCodColostrum)
+        self.btgLabelType.addButton(self.rdDMFoodMail)
 
         self.btgLabelType.buttonClicked.connect(self.btgLabelType_buttonClicked)
 
@@ -33,6 +49,10 @@ class SetupWindow(QDialog):
         layVLabelType.addWidget(lblCaptionLabelType)
         layVLabelType.addWidget(self.rbOnlyDMCod)
         layVLabelType.addWidget(self.rbDMCodDatePartyNumber)
+        layVLabelType.addWidget(self.rbDMCodDate20x20)
+        layVLabelType.addWidget(self.rbDMCodLactofera)
+        layVLabelType.addWidget(self.rdDMCodColostrum)
+        layVLabelType.addWidget(self.rdDMFoodMail)
 
         lblSetupPrinter = QLabel('Выберите принтер для контроля:')
         self.cbSetupPrinter = QComboBox()
@@ -73,9 +93,46 @@ class SetupWindow(QDialog):
             case 'OnlyDMCod':
                 self.rbOnlyDMCod.setChecked(True)
                 self.rbDMCodDatePartyNumber.setChecked(False)
+                self.rbDMCodDate20x20.setChecked(False)
+                self.rbDMCodLactofera.setChecked(False)
+                self.rdDMCodColostrum.setChecked(False)
+                self.rdDMFoodMail.setChecked(False)
             case 'DMCodDatePartyNumber':
                 self.rbDMCodDatePartyNumber.setChecked(True)
                 self.rbOnlyDMCod.setChecked(False)
+                self.rbDMCodDate20x20.setChecked(False)
+                self.rbDMCodLactofera.setChecked(False)
+                self.rdDMCodColostrum.setChecked(False)
+                self.rdDMFoodMail.setChecked(False)
+            case 'DMCodDate20x20':
+                self.rbDMCodDate20x20.setChecked(True)
+                self.rbOnlyDMCod.setChecked(False)
+                self.rbDMCodDatePartyNumber.setChecked(False)
+                self.rbDMCodLactofera.setChecked(False)
+                self.rdDMCodColostrum.setChecked(False)
+                self.rdDMFoodMail.setChecked(False)
+            case 'DMCodLactofera':
+                self.rbDMCodLactofera.setChecked(True)
+                self.rbDMCodDate20x20.setChecked(False)
+                self.rbOnlyDMCod.setChecked(False)
+                self.rbDMCodDatePartyNumber.setChecked(False)
+                self.rdDMCodColostrum.setChecked(False)
+                self.rdDMFoodMail.setChecked(False)
+            case 'DMCodColostrum':
+                self.rdDMCodColostrum.setChecked(True)
+                self.rbDMCodLactofera.setChecked(False)
+                self.rbDMCodDate20x20.setChecked(False)
+                self.rbOnlyDMCod.setChecked(False)
+                self.rbDMCodDatePartyNumber.setChecked(False)
+                self.rdDMFoodMail.setChecked(False)
+            case 'DMFoodMail':
+                self.rdDMFoodMail.setChecked(True)
+                self.rdDMCodColostrum.setChecked(False)
+                self.rbDMCodLactofera.setChecked(False)
+                self.rbDMCodDate20x20.setChecked(False)
+                self.rbOnlyDMCod.setChecked(False)
+                self.rbDMCodDatePartyNumber.setChecked(False)
+
         PrinterControl = default['PrinterControl']
         index = self.cbSetupPrinter.findText(PrinterControl)
         self.cbSetupPrinter.setCurrentIndex(index)
