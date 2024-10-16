@@ -34,6 +34,12 @@ class BaseAction(QAction):
         self.load_file_two.setToolTip('Загрузить файл с кодами')
         # self.load_file.triggered.connect(self.load_file_triggered)
 
+        self.load_file_eps = QAction(QIcon('icons\\icons8-eps-64.png'), 'Загрузить EPS-файл', self)
+        # self.load_file.setShortcut('Alt+Q')
+        self.load_file_eps.setStatusTip('Загрузить EPS-файл')
+        self.load_file_eps.setToolTip('Загрузить EPS-файл')
+        # self.load_file.triggered.connect(self.load_file_triggered)
+
         self.setup = QAction(QIcon('icons\\setup.png'), 'Настройка', self)
         self.setup.setStatusTip('Настроить программу')
         self.setup.setToolTip('Настроить программу')
