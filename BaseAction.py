@@ -38,6 +38,7 @@ class BaseAction(QAction):
         # self.load_file.setShortcut('Alt+Q')
         self.load_file_eps.setStatusTip('Загрузить EPS-файл')
         self.load_file_eps.setToolTip('Загрузить EPS-файл')
+        # self.load_file_eps.setIconText('Загрузить EPS-файл')
         # self.load_file.triggered.connect(self.load_file_triggered)
 
         self.setup = QAction(QIcon('icons\\setup.png'), 'Настройка', self)

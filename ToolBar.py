@@ -11,9 +11,9 @@ class ToolBar(QToolBar, BaseAction):
         self.setMovable(False)
 
         # self.addAction(self.load_file)
-        self.addAction(self.load_file_two)
+        # self.addAction(self.load_file_two)
         self.addAction(self.load_file_eps)
-        self.addAction(self.setup)
+        # self.addAction(self.setup)
         self.addAction(self.about_qt)
         self.addAction(self.about)
 

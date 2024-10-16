@@ -437,7 +437,7 @@ class MainWindow(QMainWindow):
         self.progressBar.setValue(0)
         self.countProgress = 0
         self.setCursor(Qt.CursorShape.ArrowCursor)
-        self.modelSKU.modelRefreshSKU(self.id_company, id_groups=None)
+        self.modelSKU.modelRefreshSKU()
 
     @QtCore.Slot()
     def threadFinishedTwo(self, codeCount, defectCodeCount):
@@ -1028,7 +1028,7 @@ class MainWindow(QMainWindow):
         # painter.end()
         con.close()
         print(self.id_company)
-        self.modelSKU.modelRefreshSKU(self.id_company, self.id_groups)
+        self.modelSKU.modelRefreshSKU()
 
     def checkingFileUpload(self, filename):
         sql = f'''SELECT COUNT(name) FROM file_load WHERE name = "{filename}"'''
@@ -1056,7 +1056,7 @@ class MainWindow(QMainWindow):
             query.first()
             id_groups = query.value('id')
             self.id_groups = id_groups
-        self.modelSKU.modelRefreshSKU(self.id_company, id_groups)
+        self.modelSKU.modelRefreshSKU()
 
     def cbSelectCompany_currentTextChanged(self, name):  # Выбор кампании
         print(f'cbSelectCompany_currentTextChanged, {name}')
@@ -1069,4 +1069,4 @@ class MainWindow(QMainWindow):
             id_company = query.value('id')
             self.id_company = id_company
         self.cbSelectGroup.setCurrentIndex(0)
-        self.modelSKU.modelRefreshSKU(id_company, id_groups=None)
+        self.modelSKU.modelRefreshSKU()
