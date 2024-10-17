@@ -533,7 +533,7 @@ class MainWindow(QMainWindow):
 
         if selected_index == 0:
             QMessageBox.critical(self, 'Внимание', 'Выберите тип этикетки для печати')
-            return None, None, None
+            return '', '', ''
 
         selected_value = self.select_label[selected_key]
         self.cbSelectTypeLabel.setCurrentIndex(0)
@@ -541,7 +541,7 @@ class MainWindow(QMainWindow):
         selectIndexTableSKU = self.tvSKU.currentIndex().row()
         if selectIndexTableSKU == -1:
             QMessageBox.information(self, 'Внимание', 'Выберите строку для печати')
-            return None, None, None
+            return '', '', ''
 
         selectGTIN = self.tvSKU.model().index(selectIndexTableSKU, 0).data()
         return selected_key, selected_value, selectGTIN

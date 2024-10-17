@@ -125,11 +125,18 @@ def clean_up(temp_dir: str) -> None:
     # except Exception as e:
     #     raise ValueError(f"Failed to remove directory: {e}")
 
+def check_attributes_json_file(temp_dir: str) -> bool:
+    # Check if the attributes.json file exists
+    fn = os.path.join(temp_dir, 'attributes.json')
+    return os.path.exists(fn)
+
 
 def get_sku(temp_dir: str) -> str:
     # Get the SKU from the temporary directory
     # TODO Проверить наличие файла attributes.json
     fn = os.path.join(temp_dir, 'attributes.json')
+    if not os.path.exists(fn):
+        return ''
     with open(fn, 'r', encoding='utf-8') as f:
         data = json.load(f)
     keys = data['gtinProductAttributes'].keys()
@@ -155,21 +162,26 @@ def process_zip(input_zip_path: str, db_path: str, temp_dir: str = 'temp') -> No
         db_path (str): Path to the database.
         temp_dir (str, optional): Temporary directory. Defaults to 'temp'.
     """
+    try:
+        check_paths(db_path, input_zip_path)
 
-    check_paths(db_path, input_zip_path)
+        extract_zip(input_zip_path, temp_dir)
 
-    extract_zip(input_zip_path, temp_dir)
+        if get_sku(temp_dir) == '':
+            raise ValueError('SKU not found in attributes.json')
+        else:
+            sku = get_sku(temp_dir)
 
-    sku = get_sku(temp_dir)
+        sku_id = _get_sku_id(sku)
 
-    sku_id = _get_sku_id(sku)
+        # Create the database and table if not exists
+        # create_database(db_path)
 
-    # Create the database and table if not exists
-    # create_database(db_path)
+        process_eps_files(db_path, sku_id, temp_dir)
 
-    process_eps_files(db_path, sku_id, temp_dir)
-
-    clean_up(temp_dir)
+        clean_up(temp_dir)
+    except Exception as e:
+        raise ValueError(f"Failed to process ZIP: {e}")
 
 
 # Example usage:
