@@ -91,6 +91,7 @@ def insert_code(db_path, code, sku):
 
 def process_eps_files(db_path, sku_id, temp_dir):
     # Process each EPS file
+
     for file_name in os.listdir(temp_dir):
         if file_name.lower().endswith('.eps'):
             eps_path = os.path.join(temp_dir, file_name)

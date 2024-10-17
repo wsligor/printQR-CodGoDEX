@@ -1,2 +1,9 @@
 ACCESS_PRINTER = 'NETWORK'
+PRINTER_NAME = 'Godex G530 сеть'
 COMPANY = 2
+SELECT_LABEL = {
+    'Молочное море': 'BT_small',
+    'Метабиотик': 'MB_big',
+    'Лактоферра': 'LF_big',
+    'Металакт': 'ML_big',
+}

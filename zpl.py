@@ -1,6 +1,6 @@
 ZPL_BT_SMALL = """
 ^Q20,3
-^W30
+^W20
 ^H8
 ^P1
 ^S3
@@ -15,10 +15,8 @@ ZPL_BT_SMALL = """
 ^L
 Dy2-me-dd
 Th:m:s
-XRB30,32,5,0,87
+XRB60,62,5,0,33
 ~1code
-AE,230,218,1,1,0,3E,date_party
-AE,288,155,1,1,0,3E,number_party
 E
 
 """
