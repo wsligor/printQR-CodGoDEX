@@ -5,7 +5,6 @@ from PySide6.QtWidgets import QVBoxLayout, QPushButton, QHBoxLayout, QRadioButto
 
 import configparser
 
-# TODO Переопределить класс RadioButton добавить свойство для хранения текстового значения
 
 class SetupWindow(QDialog):
     def __init__(self, parent=None):

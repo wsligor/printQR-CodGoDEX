@@ -12,10 +12,11 @@ import fitz
 import win32print
 from PIL import Image as ImagePIL
 from PySide6 import QtCore, QtSql
-from PySide6.QtCore import Qt, QThread, QModelIndex
+from PySide6.QtCore import Qt, QThread, QModelIndex, Signal
 from PySide6.QtGui import QAction, QGuiApplication
 from PySide6.QtSql import QSqlQueryModel
-from PySide6.QtWidgets import QLabel, QStatusBar, QComboBox, QWidget, QVBoxLayout, QFileDialog, QDateEdit
+from PySide6.QtWidgets import QLabel, QStatusBar, QComboBox, QWidget, QVBoxLayout, QFileDialog, QDateEdit, \
+    QProgressDialog, QDialog
 from PySide6.QtWidgets import QMainWindow, QTableView, QHeaderView, QHBoxLayout, QSpinBox, QPushButton
 from PySide6.QtWidgets import QMessageBox, QProgressBar, QLineEdit
 
@@ -29,15 +30,40 @@ import zpl as zpl_print
 import CONFIG
 
 
-# TODO: добавить проверку на загрузку повторно
-
 # TODO: изменить курсор при загрузке
 
 # TODO: Запустить прогресс-бар
 
 # TODO: Сделать выбор типа этикетки автоматически
 
+
+class LoadFileDialog(QDialog):
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        self.setWindowTitle("Загрузка кодов из файла")
+        self.resize(300, 100)
+
+        layout = QVBoxLayout()
+        layout.addWidget(QLabel("Загрузка кодов из файла"))
+        self.setLayout(layout)
+
+
 # noinspection PyPep8Naming
+class LoadEPSThread(QThread):
+    finished = Signal()
+
+    def __init__(self, filename):
+        super().__init__()
+        self.filename = filename
+
+    def run(self):
+        load_order_eps.process_zip(self.filename, 'SFMDEX.db')
+
+        self.finished.emit()
+
+
 class threadCodJpgDecode(QThread):
     running = False
     signalStart = QtCore.Signal(int)
@@ -162,12 +188,16 @@ class ModelSelectCompany(QSqlQueryModel):
 
 
 # noinspection PyPep8Naming
+class LoadFileEPS:
+    pass
+
+
 class MainWindow(QMainWindow):
     select_label = CONFIG.SELECT_LABEL
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle('Молочное море/Биорич - PrintDM - GoDEX530 - v1.2.1')
+        self.setWindowTitle(f'Молочное море/Биорич - PrintDM - GoDEX530 - {CONFIG.VERSION}')
         self.resize(800, 700)
         self.dlg = None
         self.countProgress = 0
@@ -309,14 +339,57 @@ class MainWindow(QMainWindow):
         dlg.exec()
         self.readConfigINI()
 
+    def checking_loads_file(self, filename: str) -> bool:
+        """
+        Checking availability of a file with codes for printing in the database.
+        Проверка наличия файла с кодами для печати в базе данных.
+        Args:
+            filename (str): The name of the file with codes.
+            filename (str): имя файла с кодами.
+        Returns:
+            bool: True if the file is not in the database, False otherwise.
+            bool: Значение True, если файла нет в базе данных, в противном случае значение False.
+        """
+        try:
+            with sl.connect('SFMDEX.db') as con:
+                cur = con.cursor()
+
+                cur.execute('SELECT count(id) FROM file_load WHERE name = ?', (filename,))
+                return cur.fetchone()[0] == 0
+        except sl.Error as e:
+            logging.error(f'Ошибка при при проверке имени загружаемого файла: {e}')
+            return False
+
+    def save_name_load_file(self, filename: str) -> None:
+        try:
+            with sl.connect('SFMDEX.db') as con:
+                cur = con.cursor()
+                cur.execute('INSERT INTO file_load (name) VALUES (?)', (filename,))
+        except sl.Error as e:
+            logging.error(f'Ошибка при записи в таблицу "file_load": {e}')
+
     def load_file_eps_triggered(self):
         app_dir = os.getcwd()
         dir_load = f'{app_dir}'
         filename: str = QFileDialog.getOpenFileName(self, 'Открыть файл', dir_load, 'ZIP files (*.zip)')[0]
         if not filename:  # проверка на пустую строку
             return
-
+        if not self.checking_loads_file(filename):
+            QMessageBox.warning(self, 'Внимание', 'Файл уже загружен')
+            return
+        self.setCursor(Qt.CursorShape.BusyCursor)
+        # self.progress_dialog = QProgressDialog('Загрузка кодов...', None, 0, 0, self)
+        # self.progress_dialog.setModal(True)
+        # self.progress_dialog.setAutoClose(True)
+        # self.thread = LoadEPSThread(filename)
+        # self.thread.finished.connect(self.progress_dialog.close)
+        # self.thread.start()
+        self.setEnabled(False)
         load_order_eps.process_zip(filename, 'SFMDEX.db')
+        self.setEnabled(True)
+        self.setCursor(Qt.CursorShape.ArrowCursor)
+        QMessageBox.information(self, 'Внимание', 'Загрузка кодов прошла успешно')
+        self.save_name_load_file(filename)
         self.modelSKU.modelRefreshSKU()
 
     def load_file_triggered(self):

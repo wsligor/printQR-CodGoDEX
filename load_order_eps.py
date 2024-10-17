@@ -128,6 +128,7 @@ def clean_up(temp_dir: str) -> None:
 
 def get_sku(temp_dir: str) -> str:
     # Get the SKU from the temporary directory
+    # TODO Проверить наличие файла attributes.json
     fn = os.path.join(temp_dir, 'attributes.json')
     with open(fn, 'r', encoding='utf-8') as f:
         data = json.load(f)
@@ -136,8 +137,9 @@ def get_sku(temp_dir: str) -> str:
     return key
 
 
-def get_sku_id(sku: str) -> int:
+def _get_sku_id(sku: str) -> int:
     # Get the SKU ID from the database
+    #  TODO Проверить существование gtin в базе
     conn = sqlite3.connect('SFMDEX.db')
     cursor = conn.cursor()
     cursor.execute('SELECT id FROM sku WHERE gtin = ?', (sku,))
@@ -160,7 +162,7 @@ def process_zip(input_zip_path: str, db_path: str, temp_dir: str = 'temp') -> No
 
     sku = get_sku(temp_dir)
 
-    sku_id = get_sku_id(sku)
+    sku_id = _get_sku_id(sku)
 
     # Create the database and table if not exists
     # create_database(db_path)
