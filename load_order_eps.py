@@ -9,6 +9,8 @@ from PIL import Image
 from datetime import datetime
 from pylibdmtx.pylibdmtx import decode
 
+from exceptions import LoadOrderEPSError
+
 # Настройка логирования
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -133,7 +135,6 @@ def check_attributes_json_file(temp_dir: str) -> bool:
 
 def get_sku(temp_dir: str) -> str:
     # Get the SKU from the temporary directory
-    # TODO Проверить наличие файла attributes.json
     fn = os.path.join(temp_dir, 'attributes.json')
     if not os.path.exists(fn):
         return ''
@@ -167,8 +168,9 @@ def process_zip(input_zip_path: str, db_path: str, temp_dir: str = 'temp') -> No
 
         extract_zip(input_zip_path, temp_dir)
 
+        # TODO Разобраться с исключениями
         if get_sku(temp_dir) == '':
-            raise ValueError('SKU not found in attributes.json')
+            raise LoadOrderEPSError('SKU not found in attributes.json')
         else:
             sku = get_sku(temp_dir)
 
@@ -180,7 +182,7 @@ def process_zip(input_zip_path: str, db_path: str, temp_dir: str = 'temp') -> No
         process_eps_files(db_path, sku_id, temp_dir)
 
         clean_up(temp_dir)
-    except Exception as e:
+    except LoadOrderEPSError as e:
         raise ValueError(f"Failed to process ZIP: {e}")
 
 

@@ -1,33 +1,29 @@
-import configparser
-from datetime import datetime
+# import configparser
 import logging
 import os
-import shutil
 import socket
 import sqlite3 as sl
 from datetime import date
+from datetime import datetime
 from typing import List, Tuple, Any
 
-import fitz
 import win32print
-from PIL import Image as ImagePIL
 from PySide6 import QtCore, QtSql
 from PySide6.QtCore import Qt, QThread, QModelIndex, Signal
 from PySide6.QtGui import QAction, QGuiApplication
 from PySide6.QtSql import QSqlQueryModel
-from PySide6.QtWidgets import QLabel, QStatusBar, QComboBox, QWidget, QVBoxLayout, QFileDialog, QDateEdit, \
-    QProgressDialog, QDialog
+from PySide6.QtWidgets import QLabel, QStatusBar, QComboBox, QWidget, QVBoxLayout, QFileDialog, QDateEdit, QDialog
 from PySide6.QtWidgets import QMainWindow, QTableView, QHeaderView, QHBoxLayout, QSpinBox, QPushButton
 from PySide6.QtWidgets import QMessageBox, QProgressBar, QLineEdit
 
-import CommonVar as cv
+import CONFIG
 import load_order_eps
+import zpl as zpl_print
 from MainMenu import MainMenu
 from ModelSKU import ModelSKU
-from SetupWindow import SetupWindow
+# from SetupWindow import SetupWindow
 from ToolBar import ToolBar
-import zpl as zpl_print
-import CONFIG
+from exceptions import LoadOrderEPSError
 
 
 # TODO: изменить курсор при загрузке
@@ -64,7 +60,7 @@ class LoadEPSThread(QThread):
         self.finished.emit()
 
 
-class threadCodJpgDecode(QThread):
+class ThreadCodJpgDecode(QThread):
     running = False
     signalStart = QtCore.Signal(int)
     signalExec = QtCore.Signal()
@@ -180,9 +176,9 @@ class ModelSelectGroup(QSqlQueryModel):
 class ModelSelectCompany(QSqlQueryModel):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.refresdSelectCompany()
+        self.refreshSelectCompany()
 
-    def refresdSelectCompany(self):
+    def refreshSelectCompany(self):
         sql = 'SELECT name, id FROM company ORDER BY id'
         self.setQuery(sql)
 
@@ -212,13 +208,13 @@ class MainWindow(QMainWindow):
         main_menu.load_file.triggered.connect(self.load_file_triggered)
         main_menu.load_file_two.triggered.connect(self.load_file_two_triggered)
         main_menu.load_file_eps.triggered.connect(self.load_file_eps_triggered)
-        main_menu.setup.triggered.connect(self.setupDialog_triggered)
+        # main_menu.setup.triggered.connect(self.setupDialog_triggered)
         self.setMenuBar(main_menu)
         tool_bar = ToolBar(parent=self)
         tool_bar.load_file.triggered.connect(self.load_file_triggered)
         tool_bar.load_file_two.triggered.connect(self.load_file_two_triggered)
         tool_bar.load_file_eps.triggered.connect(self.load_file_eps_triggered)
-        tool_bar.setup.triggered.connect(self.setupDialog_triggered)
+        # tool_bar.setup.triggered.connect(self.setupDialog_triggered)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, tool_bar)
         self.statusbar = QStatusBar()
         self.setStatusBar(self.statusbar)
@@ -292,7 +288,7 @@ class MainWindow(QMainWindow):
         self.centralWidget()
         self.setCentralWidget(container)
 
-        self.readConfigINI()
+        # self.readConfigINI()
         self._createContextMenuTableSKU()
         self.modelSKU.modelRefreshSKU()
 
@@ -325,30 +321,31 @@ class MainWindow(QMainWindow):
         clipboard = QGuiApplication.clipboard()
         clipboard.setText(selectGTIN)
 
-    def readConfigINI(self):
-        config = configparser.ConfigParser()
-        config.read('setting.ini')
-        default = config['DEFAULT']
-        self.LabelType = default['LabelType']
-        self.lblSelectTypeLabels = self.LabelType
-        print(f'self.lblSelectTypeLabels = {self.lblSelectTypeLabels}')
-        self.PrinterControl = default['PrinterControl']
+    # def readConfigINI(self):
+    #     config = configparser.ConfigParser()
+    #     config.read('setting.ini')
+    #     default = config['DEFAULT']
+    #     self.LabelType = default['LabelType']
+    #     self.lblSelectTypeLabels = self.LabelType
+    #     print(f'self.lblSelectTypeLabels = {self.lblSelectTypeLabels}')
+    #     self.PrinterControl = default['PrinterControl']
 
-    def setupDialog_triggered(self):
-        dlg = SetupWindow()
-        dlg.exec()
-        self.readConfigINI()
+    # def setupDialog_triggered(self):
+    #     dlg = SetupWindow()
+    #     dlg.exec()
+    #     self.readConfigINI()
 
-    def checking_loads_file(self, filename: str) -> bool:
+    @staticmethod
+    def checking_loads_file(filename: str) -> bool:
         """
         Checking availability of a file with codes for printing in the database.
         Проверка наличия файла с кодами для печати в базе данных.
         Args:
             filename (str): The name of the file with codes.
-            filename (str): имя файла с кодами.
+            имя файла с кодами.
         Returns:
             bool: True if the file is not in the database, False otherwise.
-            bool: Значение True, если файла нет в базе данных, в противном случае значение False.
+            Значение True, если файла нет в базе данных, в противном случае значение False.
         """
         try:
             with sl.connect('SFMDEX.db') as con:
@@ -360,7 +357,8 @@ class MainWindow(QMainWindow):
             logging.error(f'Ошибка при при проверке имени загружаемого файла: {e}')
             return False
 
-    def save_name_load_file(self, filename: str) -> None:
+    @staticmethod
+    def save_name_load_file(filename: str) -> None:
         try:
             with sl.connect('SFMDEX.db') as con:
                 cur = con.cursor()
@@ -385,7 +383,11 @@ class MainWindow(QMainWindow):
         # self.thread.finished.connect(self.progress_dialog.close)
         # self.thread.start()
         self.setEnabled(False)
-        load_order_eps.process_zip(filename, 'SFMDEX.db')
+        try:
+            load_order_eps.process_zip(filename, 'SFMDEX.db')
+        except LoadOrderEPSError as e:
+            QMessageBox.critical(self, 'Внимание', str(e))
+            return
         self.setEnabled(True)
         self.setCursor(Qt.CursorShape.ArrowCursor)
         QMessageBox.information(self, 'Внимание', 'Загрузка кодов прошла успешно')
@@ -422,7 +424,7 @@ class MainWindow(QMainWindow):
         id_sku = row[0]
         self.setCursor(Qt.CursorShape.WaitCursor)
 
-        self.threadOne = threadCodJpgDecode(filename, id_sku, fn)
+        self.threadOne = ThreadCodJpgDecode(filename, id_sku, fn)
         self.threadOne.signalStart.connect(self.threadStartOne)
         self.threadOne.signalExec.connect(self.threadExecOne)
         self.threadOne.signalFinished.connect(self.threadFinishedTwo)
@@ -454,12 +456,12 @@ class MainWindow(QMainWindow):
     def threadFinishedTwo(self, codeCount, defectCodeCount):
         self.statusbar.showMessage(f'Загружено {codeCount}, забраковано {defectCodeCount}', 2500)
 
-    def cbBigDM_clicked(self):
-        if self.cbBigDM.isChecked():
-            self.cbBigDM.setText('Да')
-        else:
-            self.cbBigDM.setText('Нет')
-        pass
+    # def cbBigDM_clicked(self):
+    #     if self.cbBigDM.isChecked():
+    #         self.cbBigDM.setText('Да')
+    #     else:
+    #         self.cbBigDM.setText('Нет')
+    #     pass
 
     def btnPrint_clicked(self):
         """
@@ -584,7 +586,8 @@ class MainWindow(QMainWindow):
             logging.error(f"Ошибка при запросе данных из базы: {e}")
             return [], [], None, None
 
-    def update_codes_status(self, ids_to_update: List[int]):
+    @staticmethod
+    def update_codes_status(ids_to_update: List[int]):
         """
         Обновляет статус кодов в базе данных.
         """
@@ -600,7 +603,8 @@ class MainWindow(QMainWindow):
         except sl.Error as e:
             logging.error(f"Ошибка обновления кодов в базе данных: {e}")
 
-    def prepare_zpl(self, selected_value: str, code_dm: str, number_party: str, date_party: str, prefix: str) -> str:
+    @staticmethod
+    def prepare_zpl(selected_value: str, code_dm: str, number_party: str, date_party: str, prefix: str) -> str:
         """
         Подготавливает ZPL для печати в зависимости от типа этикетки.
         """
@@ -621,7 +625,8 @@ class MainWindow(QMainWindow):
                 raise ValueError(f"Тип этикетки не поддерживается: {selected_value}")
         return zpl
 
-    def print_on_network_printer(self, zpl: str):
+    @staticmethod
+    def print_on_network_printer(zpl: str):
         """
         Печатает этикетку на сетевом принтере.
         """
@@ -636,7 +641,8 @@ class MainWindow(QMainWindow):
         except socket.error as e:
             logging.error(f"Ошибка при отправке на сетевой принтер: {e}")
 
-    def print_on_local_printer(self, zpl: str):
+    @staticmethod
+    def print_on_local_printer(zpl: str):
         """
         Печатает этикетку на локальном принтере через win32print.
         """
@@ -656,7 +662,8 @@ class MainWindow(QMainWindow):
         except Exception as e:
             logging.error(f"Ошибка при печати на локальном принтере: {e}")
 
-    def checkingFileUpload(self, filename):
+    @staticmethod
+    def checkingFileUpload(filename):
         sql = f'''SELECT COUNT(name) FROM file_load WHERE name = "{filename}"'''
         con = sl.connect('SFMDEX.db')
         cur = con.cursor()
@@ -684,14 +691,14 @@ class MainWindow(QMainWindow):
             self.id_groups = id_groups
         self.modelSKU.modelRefreshSKU()
 
-    def cbSelectCompany_currentTextChanged(self, name):  # Выбор кампании
-        id_company = 2
-        sql = f'SELECT id FROM company WHERE name = "{name}"'
-        query = QtSql.QSqlQuery()
-        query.exec(sql)
-        if query.isActive():
-            query.first()
-            id_company = query.value('id')
-            self.id_company = id_company
-        self.cbSelectGroup.setCurrentIndex(0)
-        self.modelSKU.modelRefreshSKU()
+    # def cbSelectCompany_currentTextChanged(self, name):  # Выбор кампании
+    #     id_company = 2
+    #     sql = f'SELECT id FROM company WHERE name = "{name}"'
+    #     query = QtSql.QSqlQuery()
+    #     query.exec(sql)
+    #     if query.isActive():
+    #         query.first()
+    #         id_company = query.value('id')
+    #         self.id_company = id_company
+    #     self.cbSelectGroup.setCurrentIndex(0)
+    #     self.modelSKU.modelRefreshSKU()
