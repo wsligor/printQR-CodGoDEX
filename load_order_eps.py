@@ -15,7 +15,7 @@ from exceptions import LoadOrderEPSError
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
-def profiler(func):
+def _profiler(func):
     def wrapper(*args, **kwargs):
         before = time.time()
         retval = func(*args, **kwargs)
@@ -27,21 +27,21 @@ def profiler(func):
 
 # noinspection PyShadowingNames
 # Адаптер для преобразования datetime в строку
-def adapt_datetime(dt):
+def _adapt_datetime(dt):
     return dt.strftime('%Y-%m-%d %H:%M:%S')
 
 
 # Конвертер для преобразования строки в datetime
-def convert_datetime(s):
+def _convert_datetime(s):
     return datetime.strptime(s.decode('utf-8'), '%Y-%m-%d %H:%M:%S')
 
 
 # Регистрация адаптера и конвертера
-sqlite3.register_adapter(datetime, adapt_datetime)
-sqlite3.register_converter('DATETIME', convert_datetime)
+sqlite3.register_adapter(datetime, _adapt_datetime)
+sqlite3.register_converter('DATETIME', _convert_datetime)
 
 
-def check_paths(db_path: str, input_zip_path: str) -> None:
+def _check_paths(db_path: str, input_zip_path: str) -> None:
     # Check if input_zip_path and db_path exist
     if not os.path.exists(input_zip_path):
         raise ValueError(f"Invalid input_zip_path: {input_zip_path}")
@@ -49,7 +49,7 @@ def check_paths(db_path: str, input_zip_path: str) -> None:
         raise ValueError(f"Invalid db_path: {db_path}")
 
 
-def extract_zip(input_zip_path: str, extract_to: str) -> None:
+def _extract_zip(input_zip_path: str, extract_to: str) -> None:
     # Extract all EPS files from the ZIP
     try:
         with zipfile.ZipFile(input_zip_path, 'r') as zip_ref:
@@ -59,13 +59,13 @@ def extract_zip(input_zip_path: str, extract_to: str) -> None:
 
 
 # @profiler
-def convert_eps_to_png(input_eps_path, output_png_path, resolution=300):
+def _convert_eps_to_png(input_eps_path, output_png_path, resolution=300):
     with Image.open(input_eps_path) as img:
         img.load(scale=resolution // 72)  # 72 is the default resolution for EPS files
         img.save(output_png_path, 'PNG')
 
 
-def decode_datamatrix(image_path: str) -> str:
+def _decode_datamatrix(image_path: str) -> str:
     """
     Decode the DataMatrix barcode from an image file.
 
@@ -82,7 +82,7 @@ def decode_datamatrix(image_path: str) -> str:
     return ''
 
 
-def insert_code(db_path, code, sku):
+def _insert_code(db_path, code, sku):
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     cursor.execute('INSERT INTO codes (cod, print, date_load, id_sku) VALUES (?, ?, ?, ?)',
@@ -91,7 +91,7 @@ def insert_code(db_path, code, sku):
     conn.close()
 
 
-def process_eps_files(db_path, sku_id, temp_dir):
+def _process_eps_files(db_path, sku_id, temp_dir):
     # Process each EPS file
 
     for file_name in os.listdir(temp_dir):
@@ -101,20 +101,20 @@ def process_eps_files(db_path, sku_id, temp_dir):
 
             # Convert EPS to PNG
             try:
-                convert_eps_to_png(eps_path, png_path)
+                _convert_eps_to_png(eps_path, png_path)
             except Exception as e:
                 raise ValueError(f"Failed to convert EPS to PNG: {e}")
 
             # Decode DataMatrix code from PNG
             try:
-                code = decode_datamatrix(png_path)
+                code = _decode_datamatrix(png_path)
                 if code:
-                    insert_code(db_path, code, sku_id)
+                    _insert_code(db_path, code, sku_id)
             except Exception as e:
                 raise ValueError(f"Failed to decode DataMatrix code: {e}")
 
 
-def clean_up(temp_dir: str) -> None:
+def _clean_up(temp_dir: str) -> None:
     # Clean up temporary files
     for file_name in os.listdir(temp_dir):
         file_path = os.path.join(temp_dir, file_name)
@@ -127,13 +127,13 @@ def clean_up(temp_dir: str) -> None:
     # except Exception as e:
     #     raise ValueError(f"Failed to remove directory: {e}")
 
-def check_attributes_json_file(temp_dir: str) -> bool:
+def _check_attributes_json_file(temp_dir: str) -> bool:
     # Check if the attributes.json file exists
     fn = os.path.join(temp_dir, 'attributes.json')
     return os.path.exists(fn)
 
 
-def get_sku(temp_dir: str) -> str:
+def _get_sku(temp_dir: str) -> str:
     # Get the SKU from the temporary directory
     fn = os.path.join(temp_dir, 'attributes.json')
     if not os.path.exists(fn):
@@ -164,26 +164,26 @@ def process_zip(input_zip_path: str, db_path: str, temp_dir: str = 'temp') -> No
         temp_dir (str, optional): Temporary directory. Defaults to 'temp'.
     """
     try:
-        check_paths(db_path, input_zip_path)
+        _check_paths(db_path, input_zip_path)
 
-        extract_zip(input_zip_path, temp_dir)
+        _extract_zip(input_zip_path, temp_dir)
 
         # TODO Разобраться с исключениями
-        if get_sku(temp_dir) == '':
+        if _get_sku(temp_dir) == '':
             raise LoadOrderEPSError('SKU not found in attributes.json')
         else:
-            sku = get_sku(temp_dir)
+            sku = _get_sku(temp_dir)
 
         sku_id = _get_sku_id(sku)
 
         # Create the database and table if not exists
         # create_database(db_path)
 
-        process_eps_files(db_path, sku_id, temp_dir)
+        _process_eps_files(db_path, sku_id, temp_dir)
 
-        clean_up(temp_dir)
+        _clean_up(temp_dir)
     except LoadOrderEPSError as e:
-        raise ValueError(f"Failed to process ZIP: {e}")
+        raise LoadOrderEPSError(f"Failed to process ZIP: {e}")
 
 
 # Example usage:

@@ -370,29 +370,23 @@ class MainWindow(QMainWindow):
         app_dir = os.getcwd()
         dir_load = f'{app_dir}'
         filename: str = QFileDialog.getOpenFileName(self, 'Открыть файл', dir_load, 'ZIP files (*.zip)')[0]
-        if not filename:  # проверка на пустую строку
-            return
         if not self.checking_loads_file(filename):
             QMessageBox.warning(self, 'Внимание', 'Файл уже загружен')
             return
         self.setCursor(Qt.CursorShape.BusyCursor)
-        # self.progress_dialog = QProgressDialog('Загрузка кодов...', None, 0, 0, self)
-        # self.progress_dialog.setModal(True)
-        # self.progress_dialog.setAutoClose(True)
-        # self.thread = LoadEPSThread(filename)
-        # self.thread.finished.connect(self.progress_dialog.close)
-        # self.thread.start()
+
         self.setEnabled(False)
         try:
             load_order_eps.process_zip(filename, 'SFMDEX.db')
+            self.save_name_load_file(filename)
+            self.modelSKU.modelRefreshSKU()
+            QMessageBox.information(self, 'Внимание', 'Загрузка кодов прошла успешно')
         except LoadOrderEPSError as e:
-            QMessageBox.critical(self, 'Внимание', str(e))
+            QMessageBox.critical(self, 'Внимание', f'{str(e)}: <br>Обратитесь к администратору')
             return
-        self.setEnabled(True)
-        self.setCursor(Qt.CursorShape.ArrowCursor)
-        QMessageBox.information(self, 'Внимание', 'Загрузка кодов прошла успешно')
-        self.save_name_load_file(filename)
-        self.modelSKU.modelRefreshSKU()
+        finally:
+            self.setEnabled(True)
+            self.setCursor(Qt.CursorShape.ArrowCursor)
 
     def load_file_triggered(self):
         pass
@@ -492,9 +486,9 @@ class MainWindow(QMainWindow):
             self.update_codes_status(ids_to_update)
 
             # Печать кодов
-            for code in codes_bd:
+            for index, code in enumerate(codes_bd):
                 code_dm = code[0].decode('utf-8')
-                zpl = self.prepare_zpl(selected_value, code_dm, number_party, date_party, prefix)
+                zpl = self.prepare_zpl(selected_value, code_dm, number_party, date_party, prefix, index)
 
                 # Выбор принтера и печать
                 match CONFIG.ACCESS_PRINTER:
@@ -604,14 +598,14 @@ class MainWindow(QMainWindow):
             logging.error(f"Ошибка обновления кодов в базе данных: {e}")
 
     @staticmethod
-    def prepare_zpl(selected_value: str, code_dm: str, number_party: str, date_party: str, prefix: str) -> str:
+    def prepare_zpl(selected_value: str, code_dm: str, number_party: str, date_party: str, prefix: str, index: int) -> str:
         """
         Подготавливает ZPL для печати в зависимости от типа этикетки.
         """
         match selected_value:
             case 'BT_small':
                 zpl = (zpl_print.ZPL_BT_SMALL.replace('code', code_dm).replace('number_party', prefix).
-                       replace('date_party', date_party))
+                       replace('date_party', date_party).replace('index', str(index)))
             case 'MB_big':
                 zpl = (zpl_print.ZPL_MB_BIG.replace('code', code_dm).replace('number_party', number_party).
                        replace('date_party', date_party))
