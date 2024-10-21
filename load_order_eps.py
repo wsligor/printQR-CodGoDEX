@@ -9,7 +9,37 @@ from PIL import Image
 from datetime import datetime
 from pylibdmtx.pylibdmtx import decode
 
+import config
 from exceptions import LoadOrderEPSError
+
+
+def process_zip(input_zip_path: str) -> None:
+    """
+    Process EPS files in a ZIP folder.
+    Args:
+        input_zip_path (str): Path to the ZIP file.
+    """
+    try:
+        _check_paths(config.DATABASE_NAME, input_zip_path)
+
+        _extract_zip(input_zip_path, config.TEMPORARY_DIRECTORY)
+
+        if _get_sku(config.TEMPORARY_DIRECTORY) == '':
+            raise LoadOrderEPSError('SKU not found in attributes.json')
+        else:
+            sku = _get_sku(config.TEMPORARY_DIRECTORY)
+
+        sku_id = _get_sku_id(sku)
+
+        # Create the database and table if not exists
+        # create_database(db_path)
+
+        _process_eps_files(config.DATABASE_NAME, sku_id, config.TEMPORARY_DIRECTORY)
+
+        _clean_up(config.TEMPORARY_DIRECTORY)
+    except LoadOrderEPSError as e:
+        raise LoadOrderEPSError(f"Failed to process ZIP: {e}")
+
 
 # Настройка логирования
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -20,7 +50,7 @@ def _profiler(func):
         before = time.time()
         retval = func(*args, **kwargs)
         after = time.time()
-        logging.debug("Function '%s': %s", func.__name__, after-before)
+        logging.debug("Function '%s': %s", func.__name__, after - before)
 
     return wrapper
 
@@ -44,9 +74,9 @@ sqlite3.register_converter('DATETIME', _convert_datetime)
 def _check_paths(db_path: str, input_zip_path: str) -> None:
     # Check if input_zip_path and db_path exist
     if not os.path.exists(input_zip_path):
-        raise ValueError(f"Invalid input_zip_path: {input_zip_path}")
+        raise LoadOrderEPSError(f"Invalid input_zip_path: {input_zip_path}")
     if not os.path.exists(db_path):
-        raise ValueError(f"Invalid db_path: {db_path}")
+        raise LoadOrderEPSError(f"Invalid db_path: {db_path}")
 
 
 def _extract_zip(input_zip_path: str, extract_to: str) -> None:
@@ -54,7 +84,7 @@ def _extract_zip(input_zip_path: str, extract_to: str) -> None:
     try:
         with zipfile.ZipFile(input_zip_path, 'r') as zip_ref:
             zip_ref.extractall(extract_to)
-    except Exception as e:
+    except LoadOrderEPSError as e:
         raise ValueError(f"Failed to extract ZIP: {e}")
 
 
@@ -115,17 +145,15 @@ def _process_eps_files(db_path, sku_id, temp_dir):
 
 
 def _clean_up(temp_dir: str) -> None:
-    # Clean up temporary files
+    """Clean up temporary files
+    Очистка временных файлов"""
     for file_name in os.listdir(temp_dir):
         file_path = os.path.join(temp_dir, file_name)
         try:
             os.remove(file_path)
         except Exception as e:
             raise ValueError(f"Failed to remove file: {e}")
-    # try:
-    #     os.rmdir(temp_dir)
-    # except Exception as e:
-    #     raise ValueError(f"Failed to remove directory: {e}")
+
 
 def _check_attributes_json_file(temp_dir: str) -> bool:
     # Check if the attributes.json file exists
@@ -155,33 +183,31 @@ def _get_sku_id(sku: str) -> int:
     conn.close()
     return row[0]
 
-def process_zip(input_zip_path: str, db_path: str, temp_dir: str = 'temp') -> None:
+
+def process_zip(input_zip_path: str) -> None:
     """
     Process EPS files in a ZIP folder.
     Args:
         input_zip_path (str): Path to the ZIP file.
-        db_path (str): Path to the database.
-        temp_dir (str, optional): Temporary directory. Defaults to 'temp'.
     """
     try:
-        _check_paths(db_path, input_zip_path)
+        _check_paths(config.DATABASE_NAME, input_zip_path)
 
-        _extract_zip(input_zip_path, temp_dir)
+        _extract_zip(input_zip_path, config.TEMPORARY_DIRECTORY)
 
-        # TODO Разобраться с исключениями
-        if _get_sku(temp_dir) == '':
+        if _get_sku(config.TEMPORARY_DIRECTORY) == '':
             raise LoadOrderEPSError('SKU not found in attributes.json')
         else:
-            sku = _get_sku(temp_dir)
+            sku = _get_sku(config.TEMPORARY_DIRECTORY)
 
         sku_id = _get_sku_id(sku)
 
         # Create the database and table if not exists
         # create_database(db_path)
 
-        _process_eps_files(db_path, sku_id, temp_dir)
+        _process_eps_files(config.DATABASE_NAME, sku_id, config.TEMPORARY_DIRECTORY)
 
-        _clean_up(temp_dir)
+        _clean_up(config.TEMPORARY_DIRECTORY)
     except LoadOrderEPSError as e:
         raise LoadOrderEPSError(f"Failed to process ZIP: {e}")
 

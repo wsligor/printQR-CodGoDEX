@@ -16,7 +16,7 @@ from PySide6.QtWidgets import QLabel, QStatusBar, QComboBox, QWidget, QVBoxLayou
 from PySide6.QtWidgets import QMainWindow, QTableView, QHeaderView, QHBoxLayout, QSpinBox, QPushButton
 from PySide6.QtWidgets import QMessageBox, QProgressBar, QLineEdit
 
-import CONFIG
+import config
 import load_order_eps
 import zpl as zpl_print
 from MainMenu import MainMenu
@@ -55,7 +55,7 @@ class LoadEPSThread(QThread):
         self.filename = filename
 
     def run(self):
-        load_order_eps.process_zip(self.filename, 'SFMDEX.db')
+        load_order_eps.process_zip(self.filename)
 
         self.finished.emit()
 
@@ -189,11 +189,11 @@ class LoadFileEPS:
 
 
 class MainWindow(QMainWindow):
-    select_label = CONFIG.SELECT_LABEL
+    select_label = config.SELECT_LABEL
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle(f'Молочное море/Биорич - PrintDM - GoDEX530 - {CONFIG.VERSION}')
+        self.setWindowTitle(f'Молочное море/Биорич - PrintDM - GoDEX530 - {config.VERSION}')
         self.resize(800, 700)
         self.dlg = None
         self.countProgress = 0
@@ -377,7 +377,7 @@ class MainWindow(QMainWindow):
 
         self.setEnabled(False)
         try:
-            load_order_eps.process_zip(filename, 'SFMDEX.db')
+            load_order_eps.process_zip(filename)
             self.save_name_load_file(filename)
             self.modelSKU.modelRefreshSKU()
             QMessageBox.information(self, 'Внимание', 'Загрузка кодов прошла успешно')
@@ -467,8 +467,8 @@ class MainWindow(QMainWindow):
 
         # Проверка ввода пользователя
         number_party, date_party, count_labels = self.validate_user_input()
-        if not number_party:
-            return
+        # if not number_party:
+        #     return
 
         selected_key, selected_value, selectGTIN = self.get_selected_label_info()
         if not selected_value or not selectGTIN:
@@ -488,10 +488,10 @@ class MainWindow(QMainWindow):
             # Печать кодов
             for index, code in enumerate(codes_bd):
                 code_dm = code[0].decode('utf-8')
-                zpl = self.prepare_zpl(selected_value, code_dm, number_party, date_party, prefix, index)
+                zpl = self.prepare_zpl(selected_value, code_dm, number_party, date_party, prefix, index+1)
 
                 # Выбор принтера и печать
-                match CONFIG.ACCESS_PRINTER:
+                match config.ACCESS_PRINTER:
                     case 'NETWORK':
                         self.print_on_network_printer(zpl)
                     case 'LOCAL':
@@ -510,10 +510,10 @@ class MainWindow(QMainWindow):
         Проверяет ввод пользователя в графическом интерфейсе и возвращает номер и дату партии.
         Если данные некорректны, выводит сообщение и возвращает None.
         """
-        if not self.leParty.text():
-            QMessageBox.information(self, 'Внимание', 'Введите номер партии')
-            self.leParty.setFocus()
-            return None, None, 1
+        # if not self.leParty.text():
+        #     QMessageBox.information(self, 'Внимание', 'Введите номер партии')
+        #     self.leParty.setFocus()
+        #     return None, None, 1
 
         date_party = self.deDate.date().toString('dd.MM.yyyy')
         number_party = self.leParty.text()
@@ -575,6 +575,7 @@ class MainWindow(QMainWindow):
 
                 # Формирование списка ID для обновления
                 ids_to_update = [code[1] for code in codes_bd]
+                print(id_sku[1])
                 return codes_bd, ids_to_update, id_sku[0], id_sku[1]
         except sl.Error as e:
             logging.error(f"Ошибка при запросе данных из базы: {e}")
@@ -605,7 +606,7 @@ class MainWindow(QMainWindow):
         match selected_value:
             case 'BT_small':
                 zpl = (zpl_print.ZPL_BT_SMALL.replace('code', code_dm).replace('number_party', prefix).
-                       replace('date_party', date_party).replace('index', str(index)))
+                       replace('date_party', date_party).replace('sequence_number', str(index)))
             case 'MB_big':
                 zpl = (zpl_print.ZPL_MB_BIG.replace('code', code_dm).replace('number_party', number_party).
                        replace('date_party', date_party))
@@ -640,7 +641,7 @@ class MainWindow(QMainWindow):
         """
         Печатает этикетку на локальном принтере через win32print.
         """
-        local_printer_name = CONFIG.PRINTER_NAME  # Имя локального принтера
+        local_printer_name = config.PRINTER_NAME  # Имя локального принтера
 
         try:
             hPrinter = win32print.OpenPrinter(local_printer_name)
