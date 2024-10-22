@@ -467,8 +467,6 @@ class MainWindow(QMainWindow):
 
         # Проверка ввода пользователя
         number_party, date_party, count_labels = self.validate_user_input()
-        # if not number_party:
-        #     return
 
         selected_key, selected_value, selectGTIN = self.get_selected_label_info()
         if not selected_value or not selectGTIN:
@@ -510,10 +508,10 @@ class MainWindow(QMainWindow):
         Проверяет ввод пользователя в графическом интерфейсе и возвращает номер и дату партии.
         Если данные некорректны, выводит сообщение и возвращает None.
         """
-        # if not self.leParty.text():
-        #     QMessageBox.information(self, 'Внимание', 'Введите номер партии')
-        #     self.leParty.setFocus()
-        #     return None, None, 1
+        if not self.leParty.text() and config.CHECKING_PARTY_INPUT:
+            QMessageBox.information(self, 'Внимание', 'Введите номер партии')
+            self.leParty.setFocus()
+            return None, None, 1
 
         date_party = self.deDate.date().toString('dd.MM.yyyy')
         number_party = self.leParty.text()

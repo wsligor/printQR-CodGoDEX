@@ -37,7 +37,7 @@ def process_zip(input_zip_path: str) -> None:
         _process_eps_files(config.DATABASE_NAME, sku_id, config.TEMPORARY_DIRECTORY)
 
         _clean_up(config.TEMPORARY_DIRECTORY)
-    except LoadOrderEPSError as e:
+    except Exception as e:
         raise LoadOrderEPSError(f"Failed to process ZIP: {e}")
 
 
@@ -55,14 +55,22 @@ def _profiler(func):
     return wrapper
 
 
-# noinspection PyShadowingNames
 # Адаптер для преобразования datetime в строку
 def _adapt_datetime(dt):
     return dt.strftime('%Y-%m-%d %H:%M:%S')
 
 
 # Конвертер для преобразования строки в datetime
-def _convert_datetime(s):
+def _convert_datetime(s: bytes) -> datetime:
+    """
+    Converts a bytes object to a datetime object.
+
+    Args:
+        s: A bytes object containing a datetime string in the format '%Y-%m-%d %H:%M:%S'
+
+    Returns:
+        A datetime object
+    """
     return datetime.strptime(s.decode('utf-8'), '%Y-%m-%d %H:%M:%S')
 
 
@@ -84,12 +92,22 @@ def _extract_zip(input_zip_path: str, extract_to: str) -> None:
     try:
         with zipfile.ZipFile(input_zip_path, 'r') as zip_ref:
             zip_ref.extractall(extract_to)
-    except LoadOrderEPSError as e:
-        raise ValueError(f"Failed to extract ZIP: {e}")
+    except Exception as e:
+        raise LoadOrderEPSError(f"Failed to extract ZIP: {e}")
 
 
 # @profiler
-def _convert_eps_to_png(input_eps_path, output_png_path, resolution=300):
+def _convert_eps_to_png(input_eps_path: str, output_png_path: str, resolution: int = 300) -> None:
+    """
+    Convert an EPS file to a PNG file.
+
+    Args:
+        input_eps_path: The path to the EPS file.
+        output_png_path: The path to the output PNG file.
+        resolution: The resolution of the output PNG file in DPI. Defaults to 300.
+    Returns:
+        None
+    """
     with Image.open(input_eps_path) as img:
         img.load(scale=resolution // 72)  # 72 is the default resolution for EPS files
         img.save(output_png_path, 'PNG')
@@ -133,7 +151,7 @@ def _process_eps_files(db_path, sku_id, temp_dir):
             try:
                 _convert_eps_to_png(eps_path, png_path)
             except Exception as e:
-                raise ValueError(f"Failed to convert EPS to PNG: {e}")
+                raise LoadOrderEPSError(f"Failed to convert EPS to PNG: {e}")
 
             # Decode DataMatrix code from PNG
             try:
@@ -141,7 +159,7 @@ def _process_eps_files(db_path, sku_id, temp_dir):
                 if code:
                     _insert_code(db_path, code, sku_id)
             except Exception as e:
-                raise ValueError(f"Failed to decode DataMatrix code: {e}")
+                raise LoadOrderEPSError(f"Failed to decode DataMatrix code: {e}")
 
 
 def _clean_up(temp_dir: str) -> None:
@@ -152,7 +170,7 @@ def _clean_up(temp_dir: str) -> None:
         try:
             os.remove(file_path)
         except Exception as e:
-            raise ValueError(f"Failed to remove file: {e}")
+            raise LoadOrderEPSError(f"Failed to remove file: {e}")
 
 
 def _check_attributes_json_file(temp_dir: str) -> bool:
@@ -184,38 +202,10 @@ def _get_sku_id(sku: str) -> int:
     return row[0]
 
 
-def process_zip(input_zip_path: str) -> None:
-    """
-    Process EPS files in a ZIP folder.
-    Args:
-        input_zip_path (str): Path to the ZIP file.
-    """
-    try:
-        _check_paths(config.DATABASE_NAME, input_zip_path)
-
-        _extract_zip(input_zip_path, config.TEMPORARY_DIRECTORY)
-
-        if _get_sku(config.TEMPORARY_DIRECTORY) == '':
-            raise LoadOrderEPSError('SKU not found in attributes.json')
-        else:
-            sku = _get_sku(config.TEMPORARY_DIRECTORY)
-
-        sku_id = _get_sku_id(sku)
-
-        # Create the database and table if not exists
-        # create_database(db_path)
-
-        _process_eps_files(config.DATABASE_NAME, sku_id, config.TEMPORARY_DIRECTORY)
-
-        _clean_up(config.TEMPORARY_DIRECTORY)
-    except LoadOrderEPSError as e:
-        raise LoadOrderEPSError(f"Failed to process ZIP: {e}")
-
-
 # Example usage:
 if __name__ == '__main__':
     input_zip_path = 'input.zip'  # Path to the input ZIP file with EPS files
     db_path = 'SFMDEX.db'  # Path to the SQLite database file
     # sku = '099'  # SKU KPD(КПД)
     # sku = '129'  # SKU Peptide Antiage A1
-    process_zip(input_zip_path, db_path)
+    process_zip(input_zip_path)
