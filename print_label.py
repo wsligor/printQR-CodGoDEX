@@ -2,13 +2,14 @@ from dataclasses import dataclass
 import logging
 from datetime import datetime
 import socket
-
 import win32print
+from typing import List, NamedTuple
+import sqlite3 as sl
 
 import zpl as zpl_print
 import config
-from typing import List, NamedTuple
-import sqlite3 as sl
+from exceptions import PrintLabelError
+
 
 @dataclass
 class OptionsPrintLabels:
@@ -29,7 +30,8 @@ def print_label(options: OptionsPrintLabels) -> None:
 
     try:
         # Получение кодов для печати
-        codes_bd, ids_to_update, id_sku, prefix = _get_codes_for_printing(options.gtin, options.count_labels)
+        prefix = _get_prefix_for_printing(options.gtin)
+        codes_bd, ids_to_update = _get_codes_for_printing(options.gtin, options.count_labels)
 
         if not codes_bd:
             logging.warning("Не найдено кодов для печати.")
@@ -49,6 +51,10 @@ def print_label(options: OptionsPrintLabels) -> None:
                     _print_on_network_printer(zpl)
                 case 'LOCAL':
                     _print_on_local_printer(zpl)
+                case 'NO PRINTING':
+                    logging.info("Печать отключена.")
+                case _:
+                    raise ValueError(f"Тип принтера не поддерживается: {config.ACCESS_PRINTER}")
 
     except sl.Error as e:
         logging.error(f"Ошибка работы с базой данных: {e}")
@@ -56,6 +62,56 @@ def print_label(options: OptionsPrintLabels) -> None:
         logging.error(f"Произошла ошибка: {e}")
     finally:
         logging.info("Завершение работы функции.")
+
+
+# Проверка контрольной суммы
+def _calculate_check_digit(gtin: str) -> int:
+    """
+    Рассчитывает контрольную цифру для GTIN по алгоритму Луна.
+
+    :param gtin: GTIN без контрольной цифры, строка из 13 цифр
+    :return: контрольная цифра, целое число
+    """
+    gtin_codes = [int(digit) for digit in gtin[:-1]]  # Преобразуем все, кроме последней цифры, в список чисел
+    total_sum = sum(gtin_codes[0::2]) * 3 + sum(gtin_codes[1::2])  # Сумма цифр с четных и нечетных позиций
+    check_digit_calculate = (10 - (total_sum % 10)) % 10  # Вычисление контрольной цифры
+    check_digit = int(gtin[-1])
+    return check_digit_calculate == check_digit
+
+
+def _is_valid_gtin(gtin: str) -> None:
+    """
+    Проверяет GTIN на соответствие формату.
+    :param gtin: GTIN без контрольной цифры, строка из 13 цифр
+    :return: True, если GTIN соответствует формату, False в противном случае
+    """
+    if len(gtin) != 14:
+        raise PrintLabelError('GTIN не соответствует формату')
+    if not gtin.isdigit():
+        raise PrintLabelError('GTIN не является числом')
+    if not _calculate_check_digit(gtin):
+        raise PrintLabelError('GTIN не соответствует формату')
+
+
+def _get_prefix_for_printing(selectGTIN) -> str:
+    """
+    Получает префикс для печати.
+    :param selectGTIN:
+    :return prefix:
+    """
+    _is_valid_gtin(selectGTIN)
+    try:
+
+        with sl.connect('SFMDEX.db') as con:
+            cur = con.cursor()
+            cur.execute('SELECT prefix FROM sku WHERE gtin = ?', (selectGTIN,))
+            prefix = cur.fetchone()[0]
+            if prefix is None:
+                raise PrintLabelError('SKU(GTIN) не найден')
+            return prefix
+    except sl.Error as e:
+        logging.error(f"Ошибка при запросе данных из базы: {e}")
+        raise PrintLabelError('Произошла ошибка при запросе данных из базы "prefix"')
 
 
 def _get_codes_for_printing(selectGTIN, count_labels):
@@ -68,34 +124,33 @@ def _get_codes_for_printing(selectGTIN, count_labels):
 
             # Получение SKU
             cur.execute('SELECT id, prefix FROM sku WHERE gtin = ?', (selectGTIN,))
-            id_sku = cur.fetchone()
+            result = cur.fetchone()
+            print(result)
+            id_sku, prefix = result
             if id_sku is None:
-                print('Товар не найден')
-                # QMessageBox.information(self, 'Внимание', )
-                return [], [], None, None
+                raise PrintLabelError('SKU(GTIN) не найден')
 
             # Проверка доступности кодов
-            cur.execute('SELECT COUNT(cod) FROM codes WHERE id_sku = ?', (id_sku[0],))
+            cur.execute('SELECT COUNT(cod) FROM codes WHERE id_sku = ?', (id_sku,))
             record = cur.fetchone()
             if count_labels > record[0]:
-                print('Недостаточно кодов для печати')
-                # QMessageBox.information(self, 'Внимание', 'Загрузите коды, не хватает для печати')
-                return [], [], None, None
+                raise PrintLabelError('Недостаточно кодов для печати')
 
             # Получение кодов для печати
             cur.execute('''
                 SELECT cod, id FROM codes 
                 WHERE print = 0 AND id_sku = ? 
                 ORDER BY date_load 
-                LIMIT ?''', (id_sku[0], count_labels))
+                LIMIT ?''', (id_sku, count_labels))
             codes_bd = cur.fetchall()
 
             # Формирование списка ID для обновления
             ids_to_update = [code[1] for code in codes_bd]
-            return codes_bd, ids_to_update, id_sku[0], id_sku[1]
+            print(codes_bd, ids_to_update, prefix)
+            return codes_bd, ids_to_update
     except sl.Error as e:
         logging.error(f"Ошибка при запросе данных из базы: {e}")
-        return [], [], None, None
+        raise PrintLabelError('Произошла ошибка при запросе данных из базы')
 
 
 def _update_codes_status(ids_to_update: List[int]):
@@ -178,10 +233,12 @@ def _print_on_local_printer(zpl: str):
 
 if __name__ == '__main__':
     options = OptionsPrintLabels(
-        gtin='04680147350082',
+        gtin='04680147350083',
         number_party='456',
         date_party='01.01.2024',
         count_labels=1,
         type_labels='BT_small'
     )
-    print_label(options)
+    # print_label(options)
+    print(_get_prefix_for_printing('04680147350082'))
+    # print(_get_codes_for_printing('04680147350082', 1))

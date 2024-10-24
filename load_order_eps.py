@@ -37,7 +37,7 @@ def process_zip(input_zip_path: str) -> None:
 
         _save_name_load_file(input_zip_path)
 
-        _process_eps_files(config.DATABASE_NAME, sku_id, config.TEMPORARY_DIRECTORY)
+        _process_eps_files(config.DATABASE_NAME, sku_id)
 
         _clean_up(config.TEMPORARY_DIRECTORY)
     except Exception as e:
@@ -150,13 +150,13 @@ def _insert_code(db_path, code, sku):
     conn.close()
 
 
-def _process_eps_files(db_path, sku_id, temp_dir):
+def _process_eps_files(db_path, sku_id):
     # Process each EPS file
 
-    for file_name in os.listdir(temp_dir):
+    for file_name in os.listdir(config.TEMPORARY_DIRECTORY):
         if file_name.lower().endswith('.eps'):
-            eps_path = os.path.join(temp_dir, file_name)
-            png_path = os.path.join(temp_dir, file_name + '.png')
+            eps_path = os.path.join(config.TEMPORARY_DIRECTORY, file_name)
+            png_path = os.path.join(config.TEMPORARY_DIRECTORY, file_name + '.png')
 
             # Convert EPS to PNG
             try:
@@ -241,6 +241,4 @@ if __name__ == '__main__':
     # db_path = 'SFMDEX.db'  # Path to the SQLite database file
     # # sku = '099'  # SKU KPD(КПД)
     # # sku = '129'  # SKU Peptide Antiage A1
-    # process_zip(input_zip_path)
-    _get_sku_id('04620058160578')
-    help(_get_sku_id)
+    process_zip('input.zip')

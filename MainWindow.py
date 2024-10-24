@@ -17,13 +17,15 @@ import print_label
 from MainMenu import MainMenu
 from ModelSKU import ModelSKU
 from ToolBar import ToolBar
-from exceptions import LoadOrderEPSError
+from exceptions import LoadOrderEPSError, PrintLabelError
 
 
 
 # TODO: Запустить прогресс-бар
 
 # TODO: Сделать выбор типа этикетки автоматически
+
+# TODO: Распределить файлы по каталогам для удобного обновления на локальных компьютерах
 
 
 class MainWindow(QMainWindow):
@@ -195,7 +197,10 @@ class MainWindow(QMainWindow):
         selected_key, selected_value, selectGTIN = self.get_selected_label_info()
         number_party, date_party, count_labels = self.validate_user_input()
         options = print_label.OptionsPrintLabels(selectGTIN, number_party, date_party, count_labels, selected_value)
-        print_label.print_label(options)
+        try:
+            print_label.print_label(options)
+        except PrintLabelError as e:
+            QMessageBox.critical(self, 'Внимание', f'{str(e)}: <br>Обратитесь к администратору')
         self.modelSKU.modelRefreshSKU()
         self.tvSKU.setFocus()
 
