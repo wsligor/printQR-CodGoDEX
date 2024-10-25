@@ -33,10 +33,6 @@ def print_label(options: OptionsPrintLabels) -> None:
         prefix = _get_prefix_for_printing(options.gtin)
         codes_bd, ids_to_update = _get_codes_for_printing(options.gtin, options.count_labels)
 
-        if not codes_bd:
-            logging.warning("Не найдено кодов для печати.")
-            return
-
         # Обновление статуса кодов в базе данных
         _update_codes_status(ids_to_update)
 
@@ -114,39 +110,38 @@ def _get_prefix_for_printing(selectGTIN) -> str:
         raise PrintLabelError('Произошла ошибка при запросе данных из базы "prefix"')
 
 
-def _get_codes_for_printing(selectGTIN, count_labels):
+def _get_codes_for_printing(selectGTIN: str, count_labels: int):
     """
-    Получает коды для печати и возвращает их вместе со списком ID для обновления.
+    Получает коды для печати и их ID.
+
+    :param selectGTIN: GTIN для поиска соответствующих кодов SKU.
+    :param count_labels: количество необходимых кодов для печати.
+    :return: Кортеж, содержащий:
+             - codes_bd: список кортежей с кодами для печати и их ID
+             - ids_to_update: список ID для обновления статуса печати.
+    :raises PrintLabelError: если кодов недостаточно или возникает ошибка базы данных.
     """
     try:
         with sl.connect('SFMDEX.db') as con:
             cur = con.cursor()
 
-            # Получение SKU
-            cur.execute('SELECT id, prefix FROM sku WHERE gtin = ?', (selectGTIN,))
-            result = cur.fetchone()
-            print(result)
-            id_sku, prefix = result
-            if id_sku is None:
-                raise PrintLabelError('SKU(GTIN) не найден')
-
-            # Проверка доступности кодов
-            cur.execute('SELECT COUNT(cod) FROM codes WHERE id_sku = ?', (id_sku,))
-            record = cur.fetchone()
-            if count_labels > record[0]:
-                raise PrintLabelError('Недостаточно кодов для печати')
-
-            # Получение кодов для печати
+            # Проверка и получение кодов для печати
             cur.execute('''
-                SELECT cod, id FROM codes 
-                WHERE print = 0 AND id_sku = ? 
-                ORDER BY date_load 
-                LIMIT ?''', (id_sku, count_labels))
+                SELECT codes.cod, codes.id 
+                FROM codes 
+                JOIN sku ON sku.id = codes.id_sku 
+                WHERE sku.gtin = ? AND codes.print = 0
+                ORDER BY date_load
+                LIMIT ?''', (selectGTIN, count_labels))
+
             codes_bd = cur.fetchall()
+
+            # Проверка доступности требуемого количества кодов
+            if len(codes_bd) < count_labels:
+                raise PrintLabelError('Недостаточно кодов для печати')
 
             # Формирование списка ID для обновления
             ids_to_update = [code[1] for code in codes_bd]
-            print(codes_bd, ids_to_update, prefix)
             return codes_bd, ids_to_update
     except sl.Error as e:
         logging.error(f"Ошибка при запросе данных из базы: {e}")
@@ -169,6 +164,7 @@ def _update_codes_status(ids_to_update: List[int]):
             con.commit()
     except sl.Error as e:
         logging.error(f"Ошибка обновления кодов в базе данных: {e}")
+        raise PrintLabelError('Произошла ошибка при обновлении кодов в базе данных')
 
 
 def _prepare_zpl(selected_value: str, code_dm: str, number_party: str, date_party: str, prefix: str,
