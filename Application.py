@@ -9,6 +9,5 @@ class Application(QApplication):
         super().__init__(argv)
         self.DataBase = QtSql.QSqlDatabase.addDatabase('QSQLITE')
         self.DataBase.setDatabaseName(config.DATABASE_NAME)
-        print('BD')
         if not self.DataBase.open():
             QMessageBox.critical('Внимание', 'Ошибка подключения к БД')
