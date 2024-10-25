@@ -98,7 +98,7 @@ def _get_prefix_for_printing(selectGTIN) -> str:
     _is_valid_gtin(selectGTIN)
     try:
 
-        with sl.connect('SFMDEX.db') as con:
+        with sl.connect(config.DATABASE_NAME) as con:
             cur = con.cursor()
             cur.execute('SELECT prefix FROM sku WHERE gtin = ?', (selectGTIN,))
             prefix = cur.fetchone()[0]
@@ -122,7 +122,7 @@ def _get_codes_for_printing(selectGTIN: str, count_labels: int):
     :raises PrintLabelError: если кодов недостаточно или возникает ошибка базы данных.
     """
     try:
-        with sl.connect('SFMDEX.db') as con:
+        with sl.connect(config.DATABASE_NAME) as con:
             cur = con.cursor()
 
             # Проверка и получение кодов для печати
@@ -153,7 +153,7 @@ def _update_codes_status(ids_to_update: List[int]):
     Обновляет статус кодов в базе данных.
     """
     try:
-        with sl.connect('SFMDEX.db') as con:
+        with sl.connect(config.DATABASE_NAME) as con:
             cur = con.cursor()
 
             sql = f'''

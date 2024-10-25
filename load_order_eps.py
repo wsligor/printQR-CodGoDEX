@@ -228,7 +228,7 @@ def _get_sku_id(sku: str) -> int:
 
 def _save_name_load_file(filename: str) -> None:
     try:
-        with sl.connect('SFMDEX.db') as con:
+        with sl.connect(config.DATABASE_NAME) as con:
             cur = con.cursor()
             cur.execute('INSERT INTO file_load (name) VALUES (?)', (filename,))
     except sl.Error as e:
@@ -237,8 +237,4 @@ def _save_name_load_file(filename: str) -> None:
 
 # Example usage:
 if __name__ == '__main__':
-    # input_zip_path = 'input.zip'  # Path to the input ZIP file with EPS files
-    # db_path = 'SFMDEX.db'  # Path to the SQLite database file
-    # # sku = '099'  # SKU KPD(КПД)
-    # # sku = '129'  # SKU Peptide Antiage A1
     process_zip('input.zip')

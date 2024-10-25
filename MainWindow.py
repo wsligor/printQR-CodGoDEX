@@ -164,7 +164,7 @@ class MainWindow(QMainWindow):
             Значение True, если файла нет в базе данных, в противном случае значение False.
         """
         try:
-            with sl.connect('SFMDEX.db') as con:
+            with sl.connect(config.DATABASE_NAME) as con:
                 cur = con.cursor()
 
                 cur.execute('SELECT count(id) FROM file_load WHERE name = ?', (filename,))
@@ -177,6 +177,8 @@ class MainWindow(QMainWindow):
         app_dir = os.getcwd()
         dir_load = f'{app_dir}'
         filename: str = QFileDialog.getOpenFileName(self, 'Открыть файл', dir_load, 'ZIP files (*.zip)')[0]
+        if not filename:
+            return
         if not self.checking_loads_file(filename):
             QMessageBox.warning(self, 'Внимание', 'Файл уже загружен')
             return

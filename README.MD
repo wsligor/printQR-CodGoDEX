@@ -31,3 +31,6 @@
 3. Рефакторинг модуля print_label
 4. Начало разработки модуля test_print_label
 5. Тесты для функций _get_prefix_for_printing, _calculate_check_digit, _is_valid_gtin
+
+## *Релиз v1.3.2*
+1. Рефакторинг, оптимизация, типизация функции print_label._get_codes_for_printing
