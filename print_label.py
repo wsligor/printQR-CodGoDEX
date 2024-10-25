@@ -60,7 +60,6 @@ def print_label(options: OptionsPrintLabels) -> None:
         logging.info("Завершение работы функции.")
 
 
-# Проверка контрольной суммы
 def _calculate_check_digit(gtin: str) -> int:
     """
     Рассчитывает контрольную цифру для GTIN по алгоритму Луна.
@@ -122,6 +121,9 @@ def _get_codes_for_printing(selectGTIN: str, count_labels: int):
     :raises PrintLabelError: если кодов недостаточно или возникает ошибка базы данных.
     """
     try:
+        if count_labels <= 0:
+            raise PrintLabelError('Количество кодов для печати должно быть больше нуля')
+
         with sl.connect(config.DATABASE_NAME) as con:
             cur = con.cursor()
 
@@ -206,11 +208,12 @@ def _print_on_network_printer(zpl: str):
         logging.error(f"Ошибка при отправке на сетевой принтер: {e}")
 
 
-def _print_on_local_printer(zpl: str):
+def _print_on_local_printer(zpl: str) -> None:
     """
     Печатает этикетку на локальном принтере через win32print.
     """
     local_printer_name = config.PRINTER_NAME  # Имя локального принтера
+    hPrinter = None
 
     try:
         hPrinter = win32print.OpenPrinter(local_printer_name)
@@ -222,7 +225,8 @@ def _print_on_local_printer(zpl: str):
             win32print.EndDocPrinter(hPrinter)
             logging.info(f"Этикетка успешно отправлена на локальный принтер {local_printer_name}.")
         finally:
-            win32print.ClosePrinter(hPrinter)
+            if hPrinter:
+                win32print.ClosePrinter(hPrinter)
     except Exception as e:
         logging.error(f"Ошибка при печати на локальном принтере: {e}")
 

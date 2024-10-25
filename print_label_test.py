@@ -4,7 +4,8 @@ from unittest.mock import patch, MagicMock
 import sqlite3 as sl
 
 from exceptions import PrintLabelError
-from print_label import _get_prefix_for_printing, _calculate_check_digit, _is_valid_gtin
+from print_label import _get_prefix_for_printing, _calculate_check_digit, _is_valid_gtin, _print_on_local_printer
+from print_label import _get_codes_for_printing
 
 
 class TestGetPrefixForPrinting(unittest.TestCase):
@@ -121,6 +122,131 @@ class TestIsValidGtin(unittest.TestCase):
         with self.assertRaises(PrintLabelError) as context:
             _is_valid_gtin('1234567890123')
         self.assertEqual(str(context.exception), 'GTIN не соответствует формату')
+
+
+class TestPrintOnLocalPrinter(unittest.TestCase):
+    @patch('win32print.OpenPrinter')
+    @patch('win32print.StartDocPrinter')
+    @patch('win32print.StartPagePrinter')
+    @patch('win32print.WritePrinter')
+    @patch('win32print.EndPagePrinter')
+    @patch('win32print.EndDocPrinter')
+    @patch('win32print.ClosePrinter')
+    @patch('config.PRINTER_NAME', 'TestPrinter')  # Имя принтера для теста
+    def test_successful_print(self, mock_ClosePrinter, mock_EndDocPrinter, mock_EndPagePrinter,
+                              mock_WritePrinter, mock_StartPagePrinter, mock_StartDocPrinter, mock_OpenPrinter):
+        # Настраиваем мок на возвращаемое значение от OpenPrinter
+        mock_OpenPrinter.return_value = MagicMock()  # Эмулируем дескриптор принтера
+
+        # Вызов тестируемой функции
+        _print_on_local_printer('^XA^FO50,50^ADN,36,20^FDHello, World!^FS^XZ')
+
+        # Проверка, что все методы вызваны один раз
+        mock_OpenPrinter.assert_called_once_with('TestPrinter')
+        mock_StartDocPrinter.assert_called_once()
+        mock_StartPagePrinter.assert_called_once()
+        mock_WritePrinter.assert_called_once_with(mock_OpenPrinter.return_value,
+                                                  b'^XA^FO50,50^ADN,36,20^FDHello, World!^FS^XZ')
+        mock_EndPagePrinter.assert_called_once()
+        mock_EndDocPrinter.assert_called_once()
+        mock_ClosePrinter.assert_called_once()
+
+    @patch('win32print.OpenPrinter', side_effect=Exception("Failed to open printer"))
+    @patch('config.PRINTER_NAME', 'TestPrinter')
+    def test_open_printer_error(self, mock_OpenPrinter):
+        # Логирование при ошибке
+        with self.assertLogs(level='ERROR') as log:
+            _print_on_local_printer('^XA^FO50,50^ADN,36,20^FDHello, World!^FS^XZ')
+            self.assertIn("Ошибка при печати на локальном принтере: Failed to open printer", log.output[0])
+
+    # @patch('win32print.OpenPrinter')
+    # @patch('win32print.StartDocPrinter', side_effect=Exception("Failed to start doc printer"))
+    # @patch('config.PRINTER_NAME', 'TestPrinter')
+    # def test_start_doc_printer_error(self, mock_OpenPrinter, mock_StartDocPrinter):
+    #     # Настраиваем мок для OpenPrinter, чтобы вернуть значение
+    #     mock_OpenPrinter.return_value = MagicMock()
+    #
+    #     # Логирование при ошибке
+    #     with self.assertLogs(level='ERROR') as log:
+    #         _print_on_local_printer('^XA^FO50,50^ADN,36,20^FDHello, World!^FS^XZ')
+    #         self.assertIn("Ошибка при печати на локальном принтере: Failed to start doc printer", log.output[0])
+    #
+    #     # Проверка, что OpenPrinter был вызван, а StartDocPrinter тоже вызван и выбросил ошибку
+    #     mock_OpenPrinter.assert_called_once_with('TestPrinter')
+    #     mock_StartDocPrinter.assert_called_once()
+
+
+class TestGetCodesForPrinting(unittest.TestCase):
+
+    @patch('sqlite3.connect')
+    def test_successful_retrieval(self, mock_connect):
+        mock_con = MagicMock()
+        mock_con.cursor.return_value = MagicMock()
+        mock_cur = mock_con.cursor.return_value
+        mock_cur.execute.return_value = None
+        mock_cur.fetchall.return_value = [(1, 1), (2, 2)]
+
+        mock_connect.return_value = mock_con
+
+        selectGTIN = '1234567890123'
+        count_labels = 2
+
+        codes_bd, ids_to_update = _get_codes_for_printing(selectGTIN, count_labels)
+
+        self.assertEqual(codes_bd, [(1, 1), (2, 2)])
+        self.assertEqual(ids_to_update, [1, 2])
+
+    @patch('sqlite3.connect')
+    def test_insufficient_codes(self, mock_connect):
+        mock_con = MagicMock()
+        mock_con.cursor.return_value = MagicMock()
+        mock_cur = mock_con.cursor.return_value
+        mock_cur.execute.return_value = None
+        mock_cur.fetchall.return_value = [(1, 1)]
+
+        mock_connect.return_value = mock_con
+
+        selectGTIN = '1234567890123'
+        count_labels = 2
+
+        with self.assertRaises(PrintLabelError):
+            _get_codes_for_printing(selectGTIN, count_labels)
+
+    @patch('sqlite3.connect')
+    def test_database_error(self, mock_connect):
+        mock_con = MagicMock()
+        mock_con.cursor.return_value = MagicMock()
+        mock_cur = mock_con.cursor.return_value
+        mock_cur.execute.side_effect = sl.Error('Mock database error')
+
+        mock_connect.return_value = mock_con
+
+        selectGTIN = '1234567890123'
+        count_labels = 2
+
+        with self.assertRaises(PrintLabelError):
+            _get_codes_for_printing(selectGTIN, count_labels)
+
+    def test_invalid_gtin(self):
+        selectGTIN = 'invalid_gtin'
+        count_labels = 2
+
+        with self.assertRaises(PrintLabelError):
+            _get_codes_for_printing(selectGTIN, count_labels)
+
+    def test_invalid_count_labels(self):
+        """
+        Test that _get_codes_for_printing raises a PrintLabelError
+        when the count_labels parameter is negative.
+
+        This test verifies that the function correctly handles
+        invalid input by raising an exception for negative label counts.
+        """
+        selectGTIN = '1234567890123'
+        count_labels = -1
+
+        with self.assertRaises(PrintLabelError):
+            _get_codes_for_printing(selectGTIN, count_labels)
 
 
 if __name__ == '__main__':
