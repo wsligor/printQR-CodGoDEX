@@ -3,7 +3,7 @@ import logging
 from datetime import datetime
 import socket
 import win32print
-from typing import List, NamedTuple
+from typing import List
 import sqlite3 as sl
 
 import zpl as zpl_print
@@ -18,6 +18,7 @@ class OptionsPrintLabels:
     date_party: str
     count_labels: int
     type_labels: str
+    prefix: str = ''
 
 
 def print_label(options: OptionsPrintLabels) -> None:
@@ -30,7 +31,7 @@ def print_label(options: OptionsPrintLabels) -> None:
 
     try:
         # Получение кодов для печати
-        prefix = _get_prefix_for_printing(options.gtin)
+        options.prefix = _get_prefix_for_printing(options.gtin)
         codes_bd, ids_to_update = _get_codes_for_printing(options.gtin, options.count_labels)
 
         # Обновление статуса кодов в базе данных
@@ -39,7 +40,7 @@ def print_label(options: OptionsPrintLabels) -> None:
         # Печать кодов
         for i, code in enumerate(codes_bd):
             code_dm = code[0].decode('utf-8')
-            zpl = _prepare_zpl(options.type_labels, code_dm, options.number_party, options.date_party, prefix, i + 1)
+            zpl = _prepare_zpl(options, code_dm, str(i + 1))
 
             # Выбор принтера и печать
             match config.ACCESS_PRINTER:
@@ -49,6 +50,7 @@ def print_label(options: OptionsPrintLabels) -> None:
                     _print_on_local_printer(zpl)
                 case 'NO PRINTING':
                     logging.info("Печать отключена.")
+                    print(zpl)
                 case _:
                     raise ValueError(f"Тип принтера не поддерживается: {config.ACCESS_PRINTER}")
 
@@ -169,26 +171,30 @@ def _update_codes_status(ids_to_update: List[int]):
         raise PrintLabelError('Произошла ошибка при обновлении кодов в базе данных')
 
 
-def _prepare_zpl(selected_value: str, code_dm: str, number_party: str, date_party: str, prefix: str,
-                 index: int) -> str:
+def _prepare_zpl(options: OptionsPrintLabels, code_dm: str, index: str) -> str:
     """
     Подготавливает ZPL для печати в зависимости от типа этикетки.
     """
-    match selected_value:
+    match options.type_labels:
         case 'BT_small':
-            zpl = (zpl_print.ZPL_BT_SMALL.replace('code', code_dm).replace('number_party', prefix).
-                   replace('date_party', date_party).replace('sequence_number', str(index)))
+            zpl = zpl_print.ZPL_BT_SMALL.format(code=code_dm,
+                                                prefix=options.prefix,
+                                                date_party=options.date_party,
+                                                sequence_number=str(index))
         case 'MB_big':
-            zpl = (zpl_print.ZPL_MB_BIG.replace('code', code_dm).replace('number_party', number_party).
-                   replace('date_party', date_party))
+            zpl = zpl_print.ZPL_MB_BIG.format(code=code_dm,
+                                              number_party=options.number_party,
+                                              date_party=options.date_party)
         case 'LF_big':
-            zpl = (zpl_print.ZPL_LF_BIG.replace('code', code_dm).replace('number_party', number_party).
-                   replace('date_party', date_party))
+            zpl = zpl_print.ZPL_LF_BIG.format(code=code_dm,
+                                              number_party=options.number_party,
+                                              date_party=options.date_party)
         case 'ML_big':
-            zpl = (zpl_print.ZPL_ML_BIG.replace('code', code_dm).replace('number_party', '').
-                   replace('date_party', ''))
+            zpl = zpl_print.ZPL_ML_BIG.format(code=code_dm,
+                                              number_party=options.number_party,
+                                              date_party=options.date_party)
         case _:
-            raise ValueError(f"Тип этикетки не поддерживается: {selected_value}")
+            raise ValueError(f"Тип этикетки не поддерживается: {options.type_labels}")
     return zpl
 
 
@@ -232,13 +238,13 @@ def _print_on_local_printer(zpl: str) -> None:
 
 
 if __name__ == '__main__':
-    options = OptionsPrintLabels(
-        gtin='04680147350083',
-        number_party='456',
-        date_party='01.01.2024',
-        count_labels=1,
-        type_labels='BT_small'
-    )
+    # options = OptionsPrintLabels(
+    #     gtin='04680147350083',
+    #     number_party='456',
+    #     date_party='01.01.2024',
+    #     count_labels=1,
+    #     type_labels='BT_small'
+    # )
     # print_label(options)
     print(_get_prefix_for_printing('04680147350082'))
     # print(_get_codes_for_printing('04680147350082', 1))

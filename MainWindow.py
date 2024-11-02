@@ -20,7 +20,6 @@ from ToolBar import ToolBar
 from exceptions import LoadOrderEPSError, PrintLabelError
 
 
-
 # TODO: Запустить прогресс-бар
 
 # TODO: Сделать выбор типа этикетки автоматически

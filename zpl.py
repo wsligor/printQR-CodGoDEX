@@ -18,10 +18,10 @@ Th:m:s
 Dy2-me-dd
 Th:m:s
 XRB30,30,5,0,33
-~1code
-AF,30,150,1,1,0,0,date_party
-ATB,160,80,42,42,0,0E,B,0,number_party
-AE,160,30,1,1,0,0,sequence_number
+~1{code}
+AF,30,150,1,1,0,0,{date_party}
+ATB,160,80,42,42,0,0E,B,0,{prefix}
+AE,160,30,1,1,0,0,{sequence_number}
 E
 
 """
@@ -44,9 +44,9 @@ ZPL_MB_BIG = """
 Dy2-me-dd
 Th:m:s
 XRB30,32,5,0,87
-~1code
-AD,244,195,1,1,0,3E,date_party
-AD,300,131,1,1,0,3E,number_party
+~1{code}
+AD,244,195,1,1,0,3E,{date_party}
+AD,300,131,1,1,0,3E,{number_party}
 E
 
 """
@@ -69,9 +69,9 @@ ZPL_LF_BIG = """
 Dy2-me-dd
 Th:m:s
 XRB30,32,5,0,87
-~1code
-AE,230,218,1,1,0,3E,date_party
-AE,288,155,1,1,0,3E,number_party
+~1{code}
+AE,230,218,1,1,0,3E,{date_party}
+AE,288,155,1,1,0,3E,{number_party}
 E
 
 """
@@ -94,9 +94,9 @@ ZPL_ML_BIG = """
 Dy2-me-dd
 Th:m:s
 XRB30,32,5,0,87
-~1code
-AD,244,195,1,1,0,3E,date_party
-AD,300,131,1,1,0,3E,number_party
+~1{code}
+AD,244,195,1,1,0,3E,{date_party}
+AD,300,131,1,1,0,3E,{number_party}
 E
 
 """
