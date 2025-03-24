@@ -193,6 +193,10 @@ def _prepare_zpl(options: OptionsPrintLabels, code_dm: str, index: str) -> str:
             zpl = zpl_print.ZPL_ML_BIG.format(code=code_dm,
                                               number_party=options.number_party,
                                               date_party=options.date_party)
+        case 'LF_box':
+            zpl = zpl_print.ZPL_LF_BOX.format(code=code_dm,
+                                              number_party=options.number_party,
+                                              date_party=options.date_party)
         case _:
             raise ValueError(f"Тип этикетки не поддерживается: {options.type_labels}")
     return zpl
