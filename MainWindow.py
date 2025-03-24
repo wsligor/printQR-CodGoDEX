@@ -1,138 +1,38 @@
+import logging
 import os
-import datetime
-import fitz
-import configparser
 import sqlite3 as sl
-
 from datetime import date
-from PIL import Image, ImageFont, ImageDraw
-from PIL.ImageQt import ImageQt
-from PIL import Image as ImagePIL
-from pylibdmtx.pylibdmtx import decode
-from pylibdmtx.pylibdmtx import encode
+from typing import Tuple
 
+from PySide6.QtCore import Qt, QModelIndex
 from PySide6.QtGui import QAction, QGuiApplication
-from PySide6.QtSql import QSqlQueryModel
-from PySide6.QtWidgets import QMessageBox, QProgressBar
+from PySide6.QtWidgets import QLabel, QStatusBar, QComboBox, QWidget, QVBoxLayout, QFileDialog, QDateEdit, QDialog
 from PySide6.QtWidgets import QMainWindow, QTableView, QHeaderView, QHBoxLayout, QSpinBox, QPushButton
-from PySide6.QtWidgets import QLabel, QStatusBar, QComboBox, QWidget, QVBoxLayout, QFileDialog, QDateEdit
-from PySide6.QtCore import Qt, QThread
-from PySide6 import QtPrintSupport, QtGui, QtCore, QtSql
+from PySide6.QtWidgets import QMessageBox, QProgressBar, QLineEdit
+
+import config
+import load_order_eps
+import print_label
 
 from MainMenu import MainMenu
 from ModelSKU import ModelSKU
 from ToolBar import ToolBar
-from SetupWindow import SetupWindow
-
-# Масштаб преобразования pdf в jpg = 2.08
-QR_IN_2_008 = (
-    (38, 88, 170, 220), (248, 88, 380, 220), (458, 88, 590, 220), (668, 88, 798, 220), (880, 88, 1012, 220),
-    (38, 446, 170, 578), (248, 446, 380, 578), (458, 446, 590, 578), (668, 446, 798, 578), (880, 446, 1012, 578),
-    (38, 804, 170, 936), (248, 804, 380, 936), (458, 804, 590, 936), (668, 804, 798, 936), (880, 804, 1012, 936),
-    (38, 1162, 170, 1294), (248, 1162, 380, 1294), (458, 1162, 590, 1294), (668, 1162, 798, 1294),
-    (880, 1162, 1012, 1294)
-)
-# Масштаб преобразования pdf в jpg = 1
-QR_IN_1 = (
-    (19, 43, 81, 105), (120, 43, 182, 105), (221, 43, 283, 105), (322, 43, 384, 105), (423, 43, 485, 105),
-    (19, 215, 81, 277), (120, 215, 182, 277), (221, 215, 283, 277), (322, 215, 384, 277), (423, 215, 485, 277),
-    (19, 387, 81, 449), (120, 387, 182, 449), (221, 387, 283, 449), (322, 387, 384, 449), (423, 387, 485, 449),
-    (19, 559, 81, 621), (120, 559, 182, 621), (221, 559, 283, 621), (322, 559, 384, 621), (423, 559, 485, 621)
-)
+from exceptions import LoadOrderEPSError, PrintLabelError
 
 
-class threadCodJpgDecode(QThread):
-    running = False
-    signalStart = QtCore.Signal(int)
-    signalExec = QtCore.Signal()
-    signalFinished = QtCore.Signal(int, int)
+# TODO: Запустить прогресс-бар
 
-    # method which will execute algorithm in another thread
-    def __init__(self, fileName, id_sku, fn):
-        super().__init__()
-        self.fileName = fileName
-        self.id_sku = id_sku
-        self.fn = fn
-        self.fileListCount = 0
-        self.fileList = []
+# TODO: Сделать выбор типа этикетки автоматически
 
-    def run(self):
-        orderDirectory = os.getcwd() + '\\order\\'
-        tmpDirectory = os.getcwd() + '\\tmp\\'
-        self.fileList = os.listdir(orderDirectory)
-        for file in self.fileList:
-            fullFileName = orderDirectory + file
-            os.remove(fullFileName)
-        self.convert_pdf2img(self.fileName, orderDirectory)
-        self.fileList = os.listdir(orderDirectory)
-        self.signalStart.emit(len(self.fileList))
-        defectCodeCount: int = 0
-        list_cod = []
-        for f in self.fileList:
-            print(f)
-            filename = orderDirectory + f
-            img = ImagePIL.open(filename)
-            for i in range(20):
-                crop_img = img.crop(QR_IN_1[i])
-                data = decode(crop_img)
-                if data:
-                    list_cod.append(data[0].data)
-                else:
-                    defectCodeCount += 1
-                    crop_img.save(f'{tmpDirectory}crop_img{i + defectCodeCount}.jpg')
-            self.signalExec.emit()
-
-        dateToday = date.today().strftime('%d.%m.%Y')
-        list_cod_to_BD = []
-        for cod in list_cod:
-            str_list_cod = (self.id_sku, cod, 0, 0, dateToday)
-            list_cod_to_BD.append(str_list_cod)
-
-        con = sl.connect("SFMDEX.db")
-        cur = con.cursor()
-        sql = '''INSERT INTO codes(id_sku, cod, print, id_party, date_load) values(?,?,?,?,?)'''
-        cur.executemany(sql, list_cod_to_BD)
-        sql = f'''INSERT INTO file_load (name) values("{self.fn}")'''
-        cur.execute(sql)
-        con.commit()
-        con.close()
-        self.signalFinished.emit(len(list_cod_to_BD), defectCodeCount)
-
-    @staticmethod
-    def convert_pdf2img(filename: str, orderPath: str):
-        """Преобразует PDF в изображение и создает файл за страницей"""
-        pdf_in = fitz.open(filename)
-        for index, page in enumerate(pdf_in):
-            pix = page.get_pixmap()
-            pix.save(f'{orderPath}order' + str(index) + '.jpg')
-        pdf_in.close()
-
-
-class ModelSelectGroup(QSqlQueryModel):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.refreshSelectGroup()
-
-    def refreshSelectGroup(self):
-        sql = 'SELECT name, id FROM groups ORDER BY sort'
-        self.setQuery(sql)
-
-
-class ModelSelectCompany(QSqlQueryModel):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.refreshSelectCompany()
-
-    def refreshSelectCompany(self):
-        sql = 'SELECT name, id FROM company ORDER BY id'
-        self.setQuery(sql)
+# TODO: Распределить файлы по каталогам для удобного обновления на локальных компьютерах
 
 
 class MainWindow(QMainWindow):
+    select_label = config.SELECT_LABEL
+
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.threadOne = None
-        self.setWindowTitle('Молочное море/Биорич - PrintDM - GoDEX530 - v1.0.4')
+        self.setWindowTitle(f'Молочное море/Биорич - PrintDM - GoDEX530 - {config.VERSION}')
         self.resize(800, 700)
         self.dlg = None
         self.countProgress = 0
@@ -141,14 +41,13 @@ class MainWindow(QMainWindow):
         self.id_groups = None
         self.LabelType = ''
         self.PrinterControl = ''
+        self.selectIdTableView = 0
 
         main_menu = MainMenu(self)
-        main_menu.load_file_two.triggered.connect(self.load_file_two_triggered)
-        main_menu.setup.triggered.connect(self.setupDialog_triggered)
+        main_menu.load_file_eps.triggered.connect(self.load_file_eps_triggered)
         self.setMenuBar(main_menu)
         tool_bar = ToolBar(parent=self)
-        tool_bar.load_file_two.triggered.connect(self.load_file_two_triggered)
-        tool_bar.setup.triggered.connect(self.setupDialog_triggered)
+        tool_bar.load_file_eps.triggered.connect(self.load_file_eps_triggered)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, tool_bar)
         self.statusbar = QStatusBar()
         self.setStatusBar(self.statusbar)
@@ -157,48 +56,42 @@ class MainWindow(QMainWindow):
         self.progressBar = QProgressBar()
         self.progressBar.setTextVisible(False)
 
-        lblSelectGroup = QLabel('Выберите группу:')
-        self.cbSelectGroup = QComboBox()
-        self.modelSelectGrop = ModelSelectGroup()
-        self.cbSelectGroup.setModel(self.modelSelectGrop)
-        self.cbSelectGroup.currentTextChanged.connect(self.cbSelectGroup_currentTextChanged)
-        layVSelectGroup = QVBoxLayout()
-        layVSelectGroup.addWidget(lblSelectGroup)
-        layVSelectGroup.addWidget(self.cbSelectGroup)
-
-        lblSelectCompany = QLabel('Выберите предприятие')
-        self.cbSelectCompany = QComboBox()
-        self.modelSelectCompany = ModelSelectCompany()
-        self.cbSelectCompany.setModel(self.modelSelectCompany)
-        self.cbSelectCompany.currentTextChanged.connect(self.cbSelectCompany_currentTextChanged)
-        layVSelectCompany = QVBoxLayout()
-        layVSelectCompany.addWidget(lblSelectCompany)
-        layVSelectCompany.addWidget(self.cbSelectCompany)
-
-        layHGroupCompany = QHBoxLayout()
-        layHGroupCompany.addLayout(layVSelectGroup)
-        layHGroupCompany.addLayout(layVSelectCompany)
-
         self.tvSKU = QTableView()
         self.modelSKU = ModelSKU()
         self.tvSKU.setModel(self.modelSKU)
         self.tvSKU.setSelectionBehavior(self.tvSKU.SelectionBehavior.SelectRows)
         self.refreshSKU()
+        self.tvSKU.clicked.connect(self.tvSKU_clicked)
+
+        self.strTableViewSelect = 'Строка таблицы:'
+        self.lblSelectIdTableView = QLabel()
+        self.lblSelectIdTableView.setText(self.strTableViewSelect)
+
+        layHSelectIdTableView = QHBoxLayout()
+        layHSelectIdTableView.addWidget(self.lblSelectIdTableView)
 
         lblDate = QLabel('Дата: ')
         self.deDate = QDateEdit()
-        self.deDate.setMinimumWidth(300)
+        self.deDate.setMinimumWidth(150)
         self.deDate.setDate(date.today())
         self.deDate.setDisplayFormat('dd.MM.yyyy')
+        self.deDate.setCalendarPopup(True)
+
+        lblParty = QLabel('Партия: ')
+        self.leParty = QLineEdit()
+        self.leParty.setPlaceholderText('Введите номер партии')
 
         lblCount = QLabel('Количество: ')
         self.sbCount = QSpinBox()
         self.sbCount.setValue(1)
-        self.sbCount.setMinimumWidth(300)
+        self.sbCount.setMaximum(999)
+        self.sbCount.setMinimumWidth(100)
 
         layHDateDate = QHBoxLayout()
         layHDateDate.addWidget(lblDate)
         layHDateDate.addWidget(self.deDate)
+        layHDateDate.addWidget(lblParty)
+        layHDateDate.addWidget(self.leParty)
         layHDateDate.addWidget(lblCount)
         layHDateDate.addWidget(self.sbCount)
         layHDateDate.setAlignment(Qt.AlignmentFlag.AlignLeft)
@@ -206,17 +99,18 @@ class MainWindow(QMainWindow):
         btnPrint = QPushButton('Печать')
         btnPrint.clicked.connect(self.btnPrint_clicked)
 
-        lblSelectPrinter = QLabel('Выберите принтер: ')
-        self.cbSelectPrinter = QComboBox()
-        self.cbSelectPrinter.addItems(QtPrintSupport.QPrinterInfo.availablePrinterNames())
+        lblSelectTypeLabel = QLabel('Выберите тип этикетки: ')
+        self.cbSelectTypeLabel = QComboBox()
+        self.cbSelectTypeLabel.addItem('Выберите тип этикетки')
+        self.cbSelectTypeLabel.addItems(self.select_label.keys())
         layHLabelSelectPrinter = QHBoxLayout()
-        layHLabelSelectPrinter.addWidget(lblSelectPrinter)
-        layHLabelSelectPrinter.addWidget(self.cbSelectPrinter)
+        layHLabelSelectPrinter.addWidget(lblSelectTypeLabel)
+        layHLabelSelectPrinter.addWidget(self.cbSelectTypeLabel)
         layHLabelSelectPrinter.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
         layV.addWidget(self.progressBar)
-        layV.addLayout(layHGroupCompany)
         layV.addWidget(self.tvSKU)
+        layV.addLayout(layHSelectIdTableView)
         layV.addLayout(layHDateDate)
         layV.addLayout(layHLabelSelectPrinter)
         layV.addWidget(btnPrint)
@@ -227,199 +121,127 @@ class MainWindow(QMainWindow):
         self.centralWidget()
         self.setCentralWidget(container)
 
-        self.readConfigINI()
         self._createContextMenuTableSKU()
+        self.modelSKU.modelRefreshSKU()
 
     def _createContextMenuTableSKU(self):
-        print('_createContextMenuTableSKU')
         self.tvSKU.setContextMenuPolicy(Qt.ActionsContextMenu)
         copyGtinAction = QAction('копировать GTIN', self)
         copyGtinAction.triggered.connect(self.copyGtinAction)
         self.tvSKU.addAction(copyGtinAction)
 
+    def tvSKU_clicked(self, index: QModelIndex):
+        """
+        Проверка изменения строки таблицы.
+        При изменении - обнуление номера партии.
+        """
+        row = index.row()
+        if not self.selectIdTableView == row:
+            self.selectIdTableView = row
+            self.leParty.setText('')
+            GTIN = self.tvSKU.model().index(row, 0).data()
+            name = self.tvSKU.model().index(row, 1).data()
+            self.lblSelectIdTableView.setText(f'{self.strTableViewSelect} GTIN - {GTIN}, наименование - {name}')
+
     def copyGtinAction(self):
-        print('copyGtinAction')
         selectIndexTableSKU = self.tvSKU.currentIndex().row()
         selectGTIN = self.tvSKU.model().index(selectIndexTableSKU, 0).data()
 
         clipboard = QGuiApplication.clipboard()
         clipboard.setText(selectGTIN)
 
-    def readConfigINI(self):
-        config = configparser.ConfigParser()
-        config.read('setting.ini')
-        default = config['DEFAULT']
-        self.LabelType = default['LabelType']
-        self.PrinterControl = default['PrinterControl']
+    @staticmethod
+    def checking_loads_file(filename: str) -> bool:
+        """
+        Checking availability of a file with codes for printing in the database.
+        Проверка наличия файла с кодами для печати в базе данных.
+        Args:
+            filename (str): The name of the file with codes.
+            имя файла с кодами.
+        Returns:
+            bool: True if the file is not in the database, False otherwise.
+            Значение True, если файла нет в базе данных, в противном случае значение False.
+        """
+        try:
+            with sl.connect(config.DATABASE_NAME) as con:
+                cur = con.cursor()
 
-    def setupDialog_triggered(self):
-        dlg = SetupWindow()
-        dlg.exec()
-        self.readConfigINI()
+                cur.execute('SELECT count(id) FROM file_load WHERE name = ?', (filename,))
+                return cur.fetchone()[0] == 0
+        except sl.Error as e:
+            logging.error(f'Ошибка при при проверке имени загружаемого файла: {e}')
+            return False
 
-    def load_file_two_triggered(self):
-        filename: str = QFileDialog.getOpenFileName(self, 'Открыть файл', os.getcwd(), 'PDF files (*.pdf)')[0]
-        if not filename:  # проверка на пустую строку
+    def load_file_eps_triggered(self):
+        app_dir = os.getcwd()
+        dir_load = f'{app_dir}'
+        filename: str = QFileDialog.getOpenFileName(self, 'Открыть файл', dir_load, 'ZIP files (*.zip)')[0]
+        if not filename:
             return
-        fn = os.path.basename(filename)
-        result = self.checkingFileUpload(fn)
-        if result:
-            QMessageBox.critical(self, 'Внимание', 'Этот файл уже загружен в БД')
+        if not self.checking_loads_file(filename):
+            QMessageBox.warning(self, 'Внимание', 'Файл уже загружен')
             return
-        filelist = filename.split('_')
-        gtin: str = filelist[3]
-        if not gtin.isnumeric():
-            QMessageBox.critical(self, 'Внимание', 'Нарушен формат имени файла. Обратитесь к администратору')
+        self.setCursor(Qt.CursorShape.BusyCursor)
+        self.setEnabled(False)
+        try:
+            load_order_eps.process_zip(filename)
+            self.modelSKU.modelRefreshSKU()
+            QMessageBox.information(self, 'Внимание', 'Загрузка кодов прошла успешно')
+        except LoadOrderEPSError as e:
+            QMessageBox.critical(self, 'Внимание', f'{str(e)}: <br>Обратитесь к администратору')
             return
-
-        con = sl.connect('SFMDEX.db')
-        cur = con.cursor()
-        sql = f'SELECT id FROM sku WHERE gtin = "{gtin}"'
-        cur.execute(sql)
-        row = cur.fetchone()
-        if row is None:
-            QMessageBox.critical(self, 'Внимание', 'gtin продукта не найден. Обратитесь к администратору')
-            return
-        id_sku = row[0]
-        self.setCursor(Qt.CursorShape.WaitCursor)
-
-        self.threadOne = threadCodJpgDecode(filename, id_sku, fn)
-        self.threadOne.signalStart.connect(self.threadStartOne)
-        self.threadOne.signalExec.connect(self.threadExecOne)
-        self.threadOne.signalFinished.connect(self.threadFinishedTwo)
-        self.threadOne.finished.connect(self.threadFinishedOne)
-        self.threadOne.start()
-
-    @QtCore.Slot()
-    def threadStartOne(self, maxValueProgressBar):
-        self.statusbar.showMessage('Загрузка кодов в БД ...')
-        self.progressBar.setMaximum(maxValueProgressBar)
-
-    @QtCore.Slot()
-    def threadExecOne(self):
-        self.countProgress += 1
-        self.progressBar.setValue(self.countProgress)
-        self.statusbar.showMessage('Загрузка кодов в БД ...')
-
-    @QtCore.Slot()
-    def threadFinishedOne(self):
-        self.progressBar.setValue(0)
-        self.countProgress = 0
-        self.setCursor(Qt.CursorShape.ArrowCursor)
-        self.modelSKU.modelRefreshSKU(self.id_company, id_groups=None)
-
-    @QtCore.Slot()
-    def threadFinishedTwo(self, codeCount, defectCodeCount):
-        self.statusbar.showMessage(f'Загружено {codeCount}, забраковано {defectCodeCount}', 5500)
+        finally:
+            self.setEnabled(True)
+            self.setCursor(Qt.CursorShape.ArrowCursor)
 
     def btnPrint_clicked(self):
-        printerName = self.cbSelectPrinter.currentText()
-        if printerName != self.PrinterControl:
-            QMessageBox.critical(self, 'Attention', 'Установите принтер для печати этикеток')
-            return
-        dt = datetime.datetime.strptime(self.deDate.text(), "%d.%m.%Y")
-        current_date = datetime.datetime.today() - datetime.timedelta(days=1)
-        if dt < current_date:
-            QMessageBox.critical(self, 'Внимание', 'Измените дату')
-            return
-        if int(self.sbCount.text()) == 0:
-            QMessageBox.critical(self, 'Внимание', 'Введите количество')
-            return
+        selected_key, selected_value, selectGTIN = self.get_selected_label_info()
+        number_party, date_party, count_labels = self.validate_user_input()
+        options = print_label.OptionsPrintLabels(selectGTIN, number_party, date_party, count_labels, selected_value)
+        try:
+            print_label.print_label(options)
+        except PrintLabelError as e:
+            QMessageBox.critical(self, 'Внимание', f'{str(e)}: <br>Обратитесь к администратору')
+        self.modelSKU.modelRefreshSKU()
+        self.tvSKU.setFocus()
+
+    def get_selected_label_info(self) -> Tuple[str, str, str]:
+        """
+        Получает информацию о выбранной этикетке и строке SKU.
+        """
+        selected_index = self.cbSelectTypeLabel.currentIndex()
+        selected_key = self.cbSelectTypeLabel.currentText()
+
+        if selected_index == 0:
+            QMessageBox.critical(self, 'Внимание', 'Выберите тип этикетки для печати')
+            return '', '', ''
+
+        selected_value = self.select_label[selected_key]
+        # self.cbSelectTypeLabel.setCurrentIndex(0)
+
         selectIndexTableSKU = self.tvSKU.currentIndex().row()
-        selectGTIN = self.tvSKU.model().index(selectIndexTableSKU, 0).data()
+        # if selectIndexTableSKU == -1 or selectIndexTableSKU == 0:
         if selectIndexTableSKU == -1:
-            QMessageBox.information(self, 'Внимание', 'Выделите строку для печати')
-            return
+            QMessageBox.information(self, 'Внимание', 'Выберите строку для печати')
+            return '', '', ''
 
-        con = sl.connect('SFMDEX.db')
-        cur = con.cursor()
+        selectGTIN = self.tvSKU.model().index(selectIndexTableSKU, 0).data()
+        return selected_key, selected_value, selectGTIN
 
-        sql = f'SELECT id, prefix FROM sku WHERE gtin = "{selectGTIN}"'
-        cur.execute(sql)
-        id_sku, prefix = cur.fetchone()
-        sql = f'SELECT count(cod) FROM codes WHERE id_sku = {id_sku}'
-        cur.execute(sql)
-        record = cur.fetchone()
-        if self.sbCount.value() > record[0]:
-            QMessageBox.information(self, 'Внимание', 'Загрузите коды, не хватает для печати')
-            return
+    def validate_user_input(self) -> tuple[None, None, int] | tuple[str, str, int]:
+        """
+        Проверяет ввод пользователя в графическом интерфейсе и возвращает номер и дату партии.
+        Если данные некорректны, выводит сообщение и возвращает None.
+        """
+        if not self.leParty.text() and config.CHECKING_PARTY_INPUT:
+            QMessageBox.information(self, 'Внимание', 'Введите номер партии')
+            self.leParty.setFocus()
+            return None, None, 1
 
-        sql = f'''SELECT count(prefix) FROM party WHERE prefix = "{prefix}" GROUP BY prefix'''
-        cur.execute(sql)
-        record = cur.fetchone()
-        numParty: int = 1
-        if not record:
-            nameParty: str = id_sku + '-' + '001'
-            dateParty = self.deDate.text()
-            sql = f'''INSERT INTO party (name, date_doc, prefix, number) 
-                        VALUES ("{nameParty}", "{dateParty}", "{prefix}", {numParty})'''
-        else:
-            numParty: int = 1 + record[0]
-            numberParty = str(numParty)
-            prefixParty = prefix
-            numberParty = numberParty.zfill(3)
-            nameParty = prefixParty + '-' + numberParty
-            dateParty = self.deDate.text()
-            sql = f'''INSERT INTO party (name, date_doc, prefix, number) 
-                        VALUES ("{nameParty}", "{dateParty}", "{prefixParty}", {numParty})'''
-        cur.execute(sql)
-        id_party = cur.lastrowid
-        con.commit()
-
-        printer = QtPrintSupport.QPrinter(mode=QtPrintSupport.QPrinter.PrinterMode.PrinterResolution)
-        painter = QtGui.QPainter()
-        page_size = QtGui.QPageSize(QtCore.QSize(92, 57))
-        printer.setPageSize(page_size)
-
-        sql = f'''SELECT cod, id FROM codes 
-                    WHERE id_sku = {id_sku} AND print = 0 ORDER BY date_load ASC LIMIT {self.sbCount.value()}'''
-        cur.execute(sql)
-        codes_bd = cur.fetchall()
-
-        for index, codes in enumerate(codes_bd):
-            cod, id_cod = codes
-            painter.begin(printer)
-            encoded = encode(cod, scheme='', size='26x26')
-            img_encod = Image.frombytes('RGB', (encoded.width, encoded.height), encoded.pixels)
-
-            sql = f'''UPDATE codes SET print = 1, id_party = {id_party}, date_output = "{self.deDate.text()}" 
-                        WHERE id = "{id_cod}"'''
-            cur.execute(sql)
-            con.commit()
-
-            img = Image.new('RGB', (354, 236), 'white')
-            img.paste(img_encod, (0, 0))
-            font = ImageFont.truetype('ARIALNBI.TTF', size=32)
-            drawText = ImageDraw.Draw(img)
-
-            if self.LabelType == 'DMCodDatePartyNumber':
-                drawText.text((130, 40), self.deDate.text(), font=font, fill='#1C0606')
-                drawText.text((130, 80), nameParty, font=font, fill='#1C0606')
-                drawText.text((130, 0), str(index + 1), font=font, fill='#1C0606')
-            elif self.LabelType == 'OnlyDMCod':
-                drawText.text((160, 0), str(index + 1), font=font, fill='#1C0606')
-
-            pixmap = QtGui.QPixmap(ImageQt(img))
-            painter.drawPixmap(110, 70, pixmap)
-            painter.end()
-        painter.begin(printer)
-        painter.end()
-        img.save('img.jpg')
-        con.close()
-        self.modelSKU.modelRefreshSKU(self.id_company, self.id_groups)
-
-    @staticmethod
-    def checkingFileUpload(filename):
-        sql = f'''SELECT COUNT(name) FROM file_load WHERE name = "{filename}"'''
-        con = sl.connect('SFMDEX.db')
-        cur = con.cursor()
-        cur.execute(sql)
-        row = cur.fetchone()
-        return row[0]
-        # if row == 0:
-        #     return False
-        # else:
-        #     return True
+        date_party = self.deDate.date().toString('dd.MM.yyyy')
+        number_party = self.leParty.text()
+        count_labels = self.sbCount.value()
+        return number_party, date_party, count_labels
 
     def refreshSKU(self):
         hh = self.tvSKU.horizontalHeader()
@@ -427,26 +249,3 @@ class MainWindow(QMainWindow):
         hh.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         hv = self.tvSKU.verticalHeader()
         hv.hide()
-
-    def cbSelectGroup_currentTextChanged(self, name):  # Выбор группы
-        id_groups = None
-        sql = f'SELECT id FROM groups WHERE name = "{name}"'
-        query = QtSql.QSqlQuery()
-        query.exec(sql)
-        if query.isActive():
-            query.first()
-            id_groups = query.value('id')
-            self.id_groups = id_groups
-        self.modelSKU.modelRefreshSKU(self.id_company, id_groups)
-
-    def cbSelectCompany_currentTextChanged(self, name):  # Выбор кампании
-        id_company = 1
-        sql = f'SELECT id FROM company WHERE name = "{name}"'
-        query = QtSql.QSqlQuery()
-        query.exec(sql)
-        if query.isActive():
-            query.first()
-            id_company = query.value('id')
-            self.id_company = id_company
-        self.cbSelectGroup.setCurrentIndex(0)
-        self.modelSKU.modelRefreshSKU(id_company, id_groups=None)
